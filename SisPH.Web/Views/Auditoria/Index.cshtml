@@ -1,0 +1,211 @@
+@model SisPH.Web.Models.AuditoriaViewModel
+@{
+    ViewData["Title"] = "Auditoría y Bitácora";
+    int firmasValidas = Model.Bitacora.Count(b => b.FirmaValida);
+    int firmasAlteradas = Model.Bitacora.Count(b => !b.FirmaValida);
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Auditoría Criptográfica y Registro de Errores</h1>
+        <p class="text-muted small mb-0">Verificación HMAC-SHA256 en tiempo real de la bitácora inmutable y monitoreo de excepciones (CU-18)</p>
+    </div>
+    <form asp-action="ExportarBitacora" method="post">
+        <input type="hidden" name="desde" value="@Model.Desde?.ToString("yyyy-MM-dd")" />
+        <input type="hidden" name="hasta" value="@Model.Hasta?.ToString("yyyy-MM-dd")" />
+        <input type="hidden" name="accion" value="@Model.Accion" />
+        <button type="submit" class="btn btn-outline-success btn-sm px-3 py-2">Exportar bitácora (.xlsx)</button>
+    </form>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="sisph-card p-3">
+            <div class="small text-muted">Registros de bitácora</div>
+            <div class="fs-4 fw-bold text-sisph">@Model.Bitacora.Count</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="sisph-card p-3">
+            <div class="small text-muted">Firmas HMAC válidas</div>
+            <div class="fs-4 fw-bold text-success">@firmasValidas</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="sisph-card p-3">
+            <div class="small text-muted">Firmas alteradas</div>
+            <div class="fs-4 fw-bold @(firmasAlteradas > 0 ? "text-danger" : "text-muted")">@firmasAlteradas</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="sisph-card p-3">
+            <div class="small text-muted">Errores registrados</div>
+            <div class="fs-4 fw-bold @(Model.Errores.Count > 0 ? "text-warning" : "text-muted")">@Model.Errores.Count</div>
+        </div>
+    </div>
+</div>
+
+<div class="sisph-card p-3 mb-4">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-sm-6 col-md-2">
+            <label for="audDesde" class="form-label small fw-semibold mb-1">Desde</label>
+            <input type="date" id="audDesde" name="desde" value="@Model.Desde?.ToString("yyyy-MM-dd")"
+                   class="form-control form-control-sm" />
+        </div>
+        <div class="col-sm-6 col-md-2">
+            <label for="audHasta" class="form-label small fw-semibold mb-1">Hasta</label>
+            <input type="date" id="audHasta" name="hasta" value="@Model.Hasta?.ToString("yyyy-MM-dd")"
+                   class="form-control form-control-sm" />
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <label for="audAccion" class="form-label small fw-semibold mb-1">Acción (Bitácora)</label>
+            <input type="text" id="audAccion" name="accion" value="@Model.Accion"
+                   class="form-control form-control-sm" placeholder="Ej. RegistrarPago, Login" />
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <label for="audOrigen" class="form-label small fw-semibold mb-1">Origen (Errores)</label>
+            <input type="text" id="audOrigen" name="origen" value="@Model.Origen"
+                   class="form-control form-control-sm" placeholder="Ej. ManejoErroresMiddleware" />
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-sisph flex-grow-1">Filtrar</button>
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+        </div>
+    </form>
+</div>
+
+<div class="sisph-card overflow-hidden mb-4">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <h2 class="h6 fw-bold text-sisph mb-0">1. Bitácora del Sistema (Verificación HMAC-SHA256)</h2>
+        <span class="small text-muted">Últimos @Model.Bitacora.Count registros</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Fecha</th>
+                    <th>Usuario</th>
+                    <th>Acción</th>
+                    <th>Entidad</th>
+                    <th>Detalle</th>
+                    <th class="text-end">Integridad</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Bitacora.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No se encontraron registros de bitácora.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var item in Model.Bitacora)
+                    {
+                        var reg = item.Registro;
+                        <tr>
+                            <td class="small text-nowrap">@reg.Fecha.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                            <td class="small fw-semibold">@(reg.Usuario?.Nombre ?? "Sistema")</td>
+                            <td><span class="badge badge-soft-info">@reg.Accion</span></td>
+                            <td class="small">
+                                @reg.Entidad@(!string.IsNullOrWhiteSpace(reg.EntidadId) ? $" #{reg.EntidadId}" : "")
+                            </td>
+                            <td class="small text-muted" style="max-width: 360px;">@(reg.Detalle ?? "—")</td>
+                            <td class="text-end text-nowrap">
+                                @if (item.FirmaValida)
+                                {
+                                    <span class="badge rounded-pill badge-soft-success px-3 py-1">Firma Válida</span>
+                                }
+                                else
+                                {
+                                    <partial name="_BadgeEstado" model="@("Alterada")" />
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="sisph-card overflow-hidden">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <h2 class="h6 fw-bold text-sisph mb-0">2. Registro de Errores del Sistema (LogError)</h2>
+        <span class="small text-muted">@Model.Errores.Count registro(s)</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Fecha</th>
+                    <th>Origen</th>
+                    <th>Mensaje</th>
+                    <th>Ruta</th>
+                    <th>IP</th>
+                    <th class="text-end">StackTrace</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Errores.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No hay errores registrados con los filtros actuales.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var err in Model.Errores)
+                    {
+                        <tr>
+                            <td class="small text-nowrap">@err.Fecha.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                            <td class="small fw-semibold">@err.Origen</td>
+                            <td class="small text-danger" style="max-width: 320px;">@err.Mensaje</td>
+                            <td class="small font-monospace">@(err.Ruta ?? "—")</td>
+                            <td class="small text-muted">@(err.Ip ?? "—")</td>
+                            <td class="text-end">
+                                @if (!string.IsNullOrWhiteSpace(err.StackTrace))
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            data-bs-toggle="modal" data-bs-target="#modalStack-@err.Id">
+                                        Ver detalle
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="small text-muted">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@foreach (var err in Model.Errores.Where(e => !string.IsNullOrWhiteSpace(e.StackTrace)))
+{
+    <div class="modal fade" id="modalStack-@err.Id" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title h6 fw-bold text-sisph">StackTrace · Error #@err.Id (@err.Origen)</h3>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="small mb-2">
+                        <strong>Fecha:</strong> @err.Fecha.ToString("dd/MM/yyyy HH:mm:ss") ·
+                        <strong>Ruta:</strong> @(err.Ruta ?? "—") ·
+                        <strong>IP:</strong> @(err.Ip ?? "—")
+                    </div>
+                    <div class="alert alert-danger py-2 small">@err.Mensaje</div>
+                    <pre class="bg-light border rounded p-3 small mb-0" style="white-space: pre-wrap; word-break: break-word;">@err.StackTrace</pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

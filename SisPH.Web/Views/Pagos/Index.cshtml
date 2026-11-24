@@ -1,0 +1,97 @@
+@model IEnumerable<SisPH.Entidades.Entidades.Pago>
+@using SisPH.Entidades.Entidades
+@{
+    ViewData["Title"] = "Pagos y Recibos";
+    var unidades = ViewBag.Unidades as List<Unidad> ?? new();
+    int? unidadSel = ViewBag.UnidadSeleccionada as int?;
+    var lista = Model.ToList();
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Pagos Registrados</h1>
+        <p class="text-muted small mb-0">Historial de cobranzas con recibos firmados digitalmente mediante HMAC-SHA256 y QR (CU-07)</p>
+    </div>
+    <a asp-action="Registrar" class="btn btn-sisph">+ Registrar pago</a>
+</div>
+
+<div class="sisph-card p-3 mb-3">
+    <form method="get" id="formFiltroUnidadPago" class="d-flex flex-wrap align-items-center gap-2">
+        <label for="selectUnidadPago" class="small fw-semibold mb-0">Filtrar por unidad:</label>
+        <select id="selectUnidadPago" name="unidadId" class="form-select form-select-sm" style="max-width: 280px;">
+            <option value="">Todas las unidades</option>
+            @foreach (var u in unidades)
+            {
+                <option value="@u.Id" selected="@(unidadSel == u.Id)">@u.Torre?.Nombre - @u.Numero</option>
+            }
+        </select>
+        @if (unidadSel.HasValue)
+        {
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Ver todos</a>
+        }
+    </form>
+</div>
+
+<div class="sisph-card overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Recibo #</th>
+                    <th>Fecha</th>
+                    <th>Torre / Unidad</th>
+                    <th>Método</th>
+                    <th>Referencia</th>
+                    <th>Cuotas aplicadas</th>
+                    <th>Registrado por</th>
+                    <th class="text-end">Monto</th>
+                    <th class="text-end">Comprobante</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (lista.Count == 0)
+                {
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">No hay pagos registrados.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var p in lista)
+                    {
+                        var periodos = string.Join(", ", p.Detalles.Select(d => d.Cuota?.Periodo ?? $"#{d.CuotaId}"));
+                        <tr>
+                            <td class="fw-bold">#@p.Id.ToString("D6")</td>
+                            <td class="small">@p.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>
+                                <span class="text-muted small">@p.Unidad?.Torre?.Nombre</span> ·
+                                <strong>@p.Unidad?.Numero</strong>
+                            </td>
+                            <td><span class="badge badge-soft-info">@p.Metodo</span></td>
+                            <td class="small text-muted">@(string.IsNullOrWhiteSpace(p.Referencia) ? "—" : p.Referencia)</td>
+                            <td class="small">@(string.IsNullOrWhiteSpace(periodos) ? "—" : periodos)</td>
+                            <td class="small">@(p.Usuario?.Nombre ?? "Sistema")</td>
+                            <td class="text-end fw-bold text-success">$@p.Monto.ToString("N2")</td>
+                            <td class="text-end">
+                                <a asp-action="Recibo" asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary">
+                                    Ver recibo QR
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('selectUnidadPago')?.addEventListener('change', () => {
+            const form = document.getElementById('formFiltroUnidadPago');
+            if (form instanceof HTMLFormElement) {
+                form.submit();
+            }
+        });
+    </script>
+}

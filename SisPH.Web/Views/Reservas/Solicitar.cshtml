@@ -1,0 +1,166 @@
+@model SisPH.Web.Models.SolicitarReservaViewModel
+@{
+    ViewData["Title"] = "Solicitar Reserva";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Solicitar Reserva de Área Social</h1>
+        <p class="text-muted small mb-0">Consulta las imágenes del espacio, verifica horarios ocupados y envía tu solicitud (CU-08 / CU-19)</p>
+    </div>
+    <a asp-action="MisReservas" class="btn btn-outline-secondary btn-sm">Volver a mis reservas</a>
+</div>
+
+@if (Model.Areas.Count == 0)
+{
+    <div class="alert alert-info">No hay áreas sociales activas disponibles para reservar en este momento.</div>
+}
+else
+{
+    <div class="sisph-card p-4 mb-4">
+        <form method="get" id="formConsultarArea" class="row g-3 align-items-end">
+            <div class="col-md-5">
+                <label for="selectAreaSocial" class="form-label small fw-semibold">1. Selecciona el área social</label>
+                <select id="selectAreaSocial" name="areaId" class="form-select">
+                    @foreach (var a in Model.Areas)
+                    {
+                        <option value="@a.Id" selected="@(Model.AreaId == a.Id)">
+                            @a.Nombre (Cap. @a.Capacidad · $@a.Costo.ToString("N2"))
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="inputFechaConsulta" class="form-label small fw-semibold">2. Fecha a consultar</label>
+                <input type="date" id="inputFechaConsulta" name="fecha"
+                       value="@Model.Fecha.ToString("yyyy-MM-dd")"
+                       min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                       class="form-control" required />
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-outline-primary w-100">Ver disponibilidad</button>
+            </div>
+        </form>
+    </div>
+
+    @if (Model.AreaSeleccionada is not null)
+    {
+        var area = Model.AreaSeleccionada;
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="sisph-card p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h2 class="h5 fw-bold text-sisph mb-0">@area.Nombre</h2>
+                        <span class="badge badge-soft-info">
+                            Horario: @area.HoraApertura.ToString(@"hh\:mm") - @area.HoraCierre.ToString(@"hh\:mm")
+                        </span>
+                    </div>
+                    <p class="small text-muted mb-3">@(area.Descripcion ?? "Sin descripción adicional.")</p>
+
+                    <div class="row g-2 mb-3 small">
+                        <div class="col-4">
+                            <div class="border rounded p-2 bg-light text-center">
+                                <div class="text-muted">Capacidad</div>
+                                <strong>@area.Capacidad personas</strong>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-2 bg-light text-center">
+                                <div class="text-muted">Costo</div>
+                                <strong>$@area.Costo.ToString("N2")</strong>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-2 bg-light text-center">
+                                <div class="text-muted">Depósito</div>
+                                <strong>$@area.Deposito.ToString("N2")</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="h6 fw-bold text-sisph mb-2">Galería del área</h3>
+                    @if (area.Imagenes.Any())
+                    {
+                        <partial name="_GaleriaImagenes" model="area.Imagenes" />
+                    }
+                    else
+                    {
+                        <div class="small text-muted">Esta área social no tiene imágenes cargadas.</div>
+                    }
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="sisph-card p-4 mb-3">
+                    <h2 class="h6 fw-bold text-sisph mb-2">
+                        Horarios ocupados el @Model.Fecha.ToString("dd/MM/yyyy")
+                    </h2>
+                    @if (Model.FranjasOcupadas.Count == 0)
+                    {
+                        <div class="alert alert-success py-2 small mb-0">
+                            No hay reservas aprobadas para esta fecha. Todo el horario de atención está libre.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var franja in Model.FranjasOcupadas)
+                            {
+                                <span class="badge badge-soft-danger px-3 py-2">
+                                    Ocupado: @franja.Inicio.ToString(@"hh\:mm") - @franja.Fin.ToString(@"hh\:mm")
+                                </span>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="sisph-card p-4">
+                    <h2 class="h6 fw-bold text-sisph mb-3">3. Enviar solicitud de reserva</h2>
+                    <form asp-action="Solicitar" method="post">
+                        <input type="hidden" name="areaId" value="@area.Id" />
+                        <input type="hidden" name="fecha" value="@Model.Fecha.ToString("yyyy-MM-dd")" />
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Fecha seleccionada</label>
+                            <input type="text" class="form-control bg-light" value="@Model.Fecha.ToString("dd/MM/yyyy")" readonly />
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label for="inputHoraInicio" class="form-label small fw-semibold">Hora inicio *</label>
+                                <input type="time" id="inputHoraInicio" name="horaInicio"
+                                       value="@Model.HoraInicio.ToString(@"hh\:mm")"
+                                       class="form-control" required />
+                            </div>
+                            <div class="col-6">
+                                <label for="inputHoraFin" class="form-label small fw-semibold">Hora fin *</label>
+                                <input type="time" id="inputHoraFin" name="horaFin"
+                                       value="@Model.HoraFin.ToString(@"hh\:mm")"
+                                       class="form-control" required />
+                            </div>
+                        </div>
+
+                        <div class="small text-muted mb-3">
+                            Requisito (CU-19): tu unidad debe encontrarse <strong>a paz y salvo</strong> para solicitar reservas.
+                        </div>
+
+                        <button type="submit" class="btn btn-sisph w-100">Enviar solicitud</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@section Scripts {
+    <script>
+        function recargarDisponibilidad() {
+            const form = document.getElementById('formConsultarArea');
+            if (form instanceof HTMLFormElement) {
+                form.submit();
+            }
+        }
+        document.getElementById('selectAreaSocial')?.addEventListener('change', recargarDisponibilidad);
+        document.getElementById('inputFechaConsulta')?.addEventListener('change', recargarDisponibilidad);
+    </script>
+}

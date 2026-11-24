@@ -1,0 +1,39 @@
+﻿@using SisPH.Entidades.Entidades
+@{
+    ViewData["Title"] = "Nuevo Usuario";
+    var roles = ViewBag.Roles as List<Rol> ?? new();
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-6">
+        <div class="sisph-card p-4">
+            <h1 class="h5 fw-bold text-sisph mb-3">Registrar Nuevo Usuario</h1>
+            <p class="small text-muted">El sistema generará automáticamente una contraseña temporal cifrada con BCrypt.</p>
+
+            <form asp-action="Crear" method="post">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Nombre completo</label>
+                    <input type="text" name="nombre" class="form-control" required maxlength="100" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Correo electrónico</label>
+                    <input type="email" name="correo" class="form-control" required maxlength="120" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label small fw-semibold">Rol en el sistema</label>
+                    <select name="rolId" class="form-select" required>
+                        <option value="">-- Selecciona un rol --</option>
+                        @foreach (var r in roles)
+                        {
+                            <option value="@r.Id">@r.Nombre</option>
+                        }
+                    </select>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-sisph">Guardar usuario</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

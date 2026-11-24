@@ -1,0 +1,89 @@
+@model IEnumerable<SisPH.Entidades.Entidades.Mudanza>
+@using SisPH.Entidades.Entidades
+@using SisPH.Entidades.Enums
+@{
+    ViewData["Title"] = "Control de Mudanzas";
+    var unidades = ViewBag.Unidades as List<Unidad> ?? new();
+    int? unidadSel = ViewBag.UnidadSeleccionada as int?;
+    var lista = Model.ToList();
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Control de Mudanzas</h1>
+        <p class="text-muted small mb-0">Registro de entradas y salidas con validación obligatoria de paz y salvo (CU-14 / CU-19)</p>
+    </div>
+    <a asp-action="Registrar" class="btn btn-sisph">+ Registrar mudanza</a>
+</div>
+
+<div class="sisph-card p-3 mb-3">
+    <form method="get" id="formFiltroMudanzas" class="d-flex flex-wrap align-items-center gap-2">
+        <label for="selectUnidadMudanza" class="small fw-semibold mb-0">Filtrar por unidad:</label>
+        <select id="selectUnidadMudanza" name="unidadId" class="form-select form-select-sm" style="max-width: 280px;">
+            <option value="">Todas las unidades</option>
+            @foreach (var u in unidades)
+            {
+                <option value="@u.Id" selected="@(unidadSel == u.Id)">@u.Torre?.Nombre - @u.Numero</option>
+            }
+        </select>
+        @if (unidadSel.HasValue)
+        {
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Ver todas</a>
+        }
+    </form>
+</div>
+
+<div class="sisph-card overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Fecha</th>
+                    <th>Torre / Unidad</th>
+                    <th>Tipo</th>
+                    <th>Validado por</th>
+                    <th>Observación</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (lista.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">No hay mudanzas registradas.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var m in lista)
+                    {
+                        <tr>
+                            <td class="small">@m.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>
+                                <span class="text-muted small">@m.Unidad?.Torre?.Nombre</span> ·
+                                <strong>@m.Unidad?.Numero</strong>
+                            </td>
+                            <td>
+                                <span class="badge rounded-pill @(m.Tipo == TipoMudanza.Entrada ? "badge-soft-success" : "badge-soft-warning") px-3 py-1">
+                                    @m.Tipo
+                                </span>
+                            </td>
+                            <td class="small">@(m.Usuario?.Nombre ?? "—")</td>
+                            <td class="small text-muted">@(string.IsNullOrWhiteSpace(m.Observacion) ? "—" : m.Observacion)</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('selectUnidadMudanza')?.addEventListener('change', () => {
+            const form = document.getElementById('formFiltroMudanzas');
+            if (form instanceof HTMLFormElement) {
+                form.submit();
+            }
+        });
+    </script>
+}

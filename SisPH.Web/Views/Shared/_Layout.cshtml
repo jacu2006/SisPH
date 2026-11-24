@@ -1,0 +1,247 @@
+﻿@{
+    var controladorActual = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    bool EsControladorActivo(string controlador) =>
+        string.Equals(controladorActual, controlador, StringComparison.OrdinalIgnoreCase);
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - SisPH</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <div class="sisph-wrapper" id="sisphWrapper">
+            <aside class="sisph-sidebar d-flex flex-column">
+                <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
+                    <a class="text-decoration-none fw-bold fs-5 text-sisph" asp-controller="Home" asp-action="Panel">
+                        SisPH
+                    </a>
+                    <span class="badge badge-soft-info">@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+                </div>
+
+                <nav class="nav flex-column py-3 flex-grow-1">
+                    <a class="nav-link @(EsControladorActivo("Home") ? "active" : "")" asp-controller="Home" asp-action="Panel">Panel principal</a>
+
+                    @if (User.IsInRole("Administrador"))
+                    {
+                        <button type="button"
+                                class="sisph-nav-toggle"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuAdministracion"
+                                aria-expanded="true"
+                                aria-controls="menuAdministracion">
+                            <span>Administración</span>
+                            <svg class="sisph-nav-chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                        <div class="collapse show" id="menuAdministracion">
+                            <div class="nav flex-column">
+                                <a class="nav-link @(EsControladorActivo("Usuarios") ? "active" : "")" asp-controller="Usuarios" asp-action="Index">Usuarios</a>
+                                <a class="nav-link @(EsControladorActivo("Unidades") ? "active" : "")" asp-controller="Unidades" asp-action="Index">Torres y unidades</a>
+                                <a class="nav-link @(EsControladorActivo("Residentes") ? "active" : "")" asp-controller="Residentes" asp-action="Index">Residentes</a>
+                                <a class="nav-link @(EsControladorActivo("Areas") ? "active" : "")" asp-controller="Areas" asp-action="Index">Áreas sociales</a>
+                                <a class="nav-link @(EsControladorActivo("Cuotas") ? "active" : "")" asp-controller="Cuotas" asp-action="Index">Cuotas</a>
+                                <a class="nav-link @(EsControladorActivo("Reservas") ? "active" : "")" asp-controller="Reservas" asp-action="Index">Aprobar reservas</a>
+                                <a class="nav-link @(EsControladorActivo("Reportes") ? "active" : "")" asp-controller="Reportes" asp-action="Index">Reportes y presupuesto</a>
+                                <a class="nav-link @(EsControladorActivo("Auditoria") ? "active" : "")" asp-controller="Auditoria" asp-action="Index">Auditoría y bitácora</a>
+                            </div>
+                        </div>
+                    }
+
+                    @if (User.IsInRole("Administrador") || User.IsInRole("Operador"))
+                    {
+                        <button type="button"
+                                class="sisph-nav-toggle"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuOperaciones"
+                                aria-expanded="true"
+                                aria-controls="menuOperaciones">
+                            <span>Operaciones y Garita</span>
+                            <svg class="sisph-nav-chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                        <div class="collapse show" id="menuOperaciones">
+                            <div class="nav flex-column">
+                                <a class="nav-link @(EsControladorActivo("Pagos") ? "active" : "")" asp-controller="Pagos" asp-action="Index">Registrar pagos</a>
+                                <a class="nav-link @(EsControladorActivo("Garita") ? "active" : "")" asp-controller="Garita" asp-action="Index">Control garita QR</a>
+                                <a class="nav-link @(EsControladorActivo("Mudanzas") ? "active" : "")" asp-controller="Mudanzas" asp-action="Index">Mudanzas</a>
+                                <a class="nav-link @(EsControladorActivo("Incidencias") ? "active" : "")" asp-controller="Incidencias" asp-action="Index">Incidencias</a>
+                            </div>
+                        </div>
+                    }
+
+                    @if (User.IsInRole("Residente"))
+                    {
+                        <button type="button"
+                                class="sisph-nav-toggle"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#menuPortalResidente"
+                                aria-expanded="true"
+                                aria-controls="menuPortalResidente">
+                            <span>Portal Residente</span>
+                            <svg class="sisph-nav-chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                        <div class="collapse show" id="menuPortalResidente">
+                            <div class="nav flex-column">
+                                <a class="nav-link @(EsControladorActivo("Portal") ? "active" : "")" asp-controller="Portal" asp-action="Index">Mi estado de cuenta</a>
+                                <a class="nav-link @(EsControladorActivo("Reservas") ? "active" : "")" asp-controller="Reservas" asp-action="MisReservas">Reservar área social</a>
+                                <a class="nav-link @(EsControladorActivo("Pases") ? "active" : "")" asp-controller="Pases" asp-action="Index">Pases de visita QR</a>
+                                <a class="nav-link @(EsControladorActivo("Incidencias") ? "active" : "")" asp-controller="Incidencias" asp-action="MisIncidencias">Reportar incidencia</a>
+                            </div>
+                        </div>
+                    }
+                </nav>
+
+                <div class="p-3 border-top">
+                    <a class="btn btn-outline-secondary btn-sm w-100 mb-2" asp-controller="Cuenta" asp-action="CambiarPassword">
+                        Cambiar contraseña
+                    </a>
+                    <form asp-controller="Cuenta" asp-action="Logout" method="post">
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100">Cerrar sesión</button>
+                    </form>
+                </div>
+            </aside>
+
+            <div class="sisph-main">
+                <header class="sisph-topbar px-4 d-flex align-items-center justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnToggleSidebar">
+                        ☰ Menú
+                    </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="small text-muted">Sesión:</span>
+                        <strong class="small">@User.Identity.Name</strong>
+                    </div>
+                </header>
+
+                <main class="p-4 flex-grow-1">
+                    @if (TempData["MensajeExito"] is string ok)
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            @ok
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    }
+                    @if (TempData["MensajeError"] is string err)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            @err
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    }
+
+                    @RenderBody()
+                </main>
+            </div>
+        </div>
+    }
+    else
+    {
+        <nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top">
+            <div class="container">
+                <a class="navbar-brand fw-bold text-sisph" asp-controller="Home" asp-action="Index">SisPH</a>
+                <div class="ms-auto">
+                    <a class="btn btn-sisph btn-sm px-3" asp-controller="Cuenta" asp-action="Login">Iniciar sesión</a>
+                </div>
+            </div>
+        </nav>
+
+        <main>
+            @RenderBody()
+        </main>
+
+        <footer class="border-top bg-white py-3 mt-5 text-center text-muted small">
+            SisPH · Sistema de Administración de Propiedad Horizontal · UTP FISC
+        </footer>
+    }
+
+    <div id="sisphLightbox" class="sisph-lightbox" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Imagen ampliada">
+        <button type="button" id="btnCerrarLightbox" class="sisph-lightbox-cerrar" aria-label="Cerrar imagen">&times;</button>
+        <img id="sisphLightboxImg" class="sisph-lightbox-img" alt="Imagen ampliada" />
+    </div>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const btnToggle = document.getElementById('btnToggleSidebar');
+        if (btnToggle instanceof HTMLElement) {
+            btnToggle.addEventListener('click', () => {
+                const wrapper = document.getElementById('sisphWrapper');
+                if (wrapper instanceof HTMLElement) {
+                    wrapper.classList.toggle('collapsed');
+                }
+            });
+        }
+
+        const lightbox = document.getElementById('sisphLightbox');
+        const lightboxImg = document.getElementById('sisphLightboxImg');
+        const btnCerrarLightbox = document.getElementById('btnCerrarLightbox');
+
+        function abrirLightbox(src, alt) {
+            if (!(lightbox instanceof HTMLElement) || !(lightboxImg instanceof HTMLImageElement)) {
+                return;
+            }
+            lightboxImg.src = src;
+            lightboxImg.alt = alt || 'Imagen ampliada';
+            lightbox.classList.add('abierto');
+            lightbox.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function cerrarLightbox() {
+            if (!(lightbox instanceof HTMLElement) || !(lightboxImg instanceof HTMLImageElement)) {
+                return;
+            }
+            lightbox.classList.remove('abierto');
+            lightbox.setAttribute('aria-hidden', 'true');
+            lightboxImg.removeAttribute('src');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('click', (event) => {
+            const target = event.target;
+            if (target instanceof HTMLImageElement && target.classList.contains('sisph-galeria-img')) {
+                const ruta = target.dataset.fullSrc || target.src;
+                if (ruta) {
+                    abrirLightbox(ruta, target.alt);
+                }
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && lightbox instanceof HTMLElement && lightbox.classList.contains('abierto')) {
+                cerrarLightbox();
+                return;
+            }
+            const target = event.target;
+            if ((event.key === 'Enter' || event.key === ' ') && target instanceof HTMLImageElement && target.classList.contains('sisph-galeria-img')) {
+                event.preventDefault();
+                const ruta = target.dataset.fullSrc || target.src;
+                if (ruta) {
+                    abrirLightbox(ruta, target.alt);
+                }
+            }
+        });
+
+        if (btnCerrarLightbox instanceof HTMLElement) {
+            btnCerrarLightbox.addEventListener('click', cerrarLightbox);
+        }
+
+        if (lightbox instanceof HTMLElement) {
+            lightbox.addEventListener('click', (event) => {
+                if (event.target === lightbox) {
+                    cerrarLightbox();
+                }
+            });
+        }
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

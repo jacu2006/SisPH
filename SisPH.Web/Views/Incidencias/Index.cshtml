@@ -1,0 +1,175 @@
+@model IEnumerable<SisPH.Entidades.Entidades.Incidencia>
+@using SisPH.Entidades.Enums
+@{
+    ViewData["Title"] = "Gestión de Incidencias";
+    EstadoIncidencia? estadoSel = ViewBag.EstadoSeleccionado as EstadoIncidencia?;
+    var lista = Model.ToList();
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Incidencias y Mantenimiento</h1>
+        <p class="text-muted small mb-0">Atención de reportes de residentes, registro técnico y cierre de casos (CU-11)</p>
+    </div>
+</div>
+
+<div class="sisph-card p-3 mb-3">
+    <form method="get" id="formFiltroIncidencias" class="d-flex flex-wrap align-items-center gap-2">
+        <label for="selectEstadoInc" class="small fw-semibold mb-0">Filtrar por estado:</label>
+        <select id="selectEstadoInc" name="estado" class="form-select form-select-sm" style="max-width: 220px;">
+            <option value="">Todos los estados</option>
+            @foreach (EstadoIncidencia est in Enum.GetValues<EstadoIncidencia>())
+            {
+                <option value="@est" selected="@(estadoSel == est)">@est</option>
+            }
+        </select>
+        @if (estadoSel.HasValue)
+        {
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Ver todas</a>
+        }
+    </form>
+</div>
+
+<div class="sisph-card overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Residente</th>
+                    <th>Incidencia</th>
+                    <th>Foto</th>
+                    <th>Estado</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (lista.Count == 0)
+                {
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">No hay incidencias con el filtro seleccionado.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var inc in lista)
+                    {
+                        <tr>
+                            <td class="small text-muted">#@inc.Id</td>
+                            <td class="small">@inc.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td class="small fw-semibold">@inc.Residente?.NombreCompleto()</td>
+                            <td style="max-width: 340px;">
+                                <div class="fw-semibold text-sisph">@inc.Titulo</div>
+                                <div class="small text-muted">@inc.Descripcion</div>
+                                @if (!string.IsNullOrWhiteSpace(inc.ObservacionTecnica))
+                                {
+                                    <div class="small mt-1 p-2 bg-light border rounded">
+                                        <strong>Obs. técnica:</strong> @inc.ObservacionTecnica
+                                    </div>
+                                }
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(inc.Foto))
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            data-bs-toggle="modal" data-bs-target="#modalFotoInc-@inc.Id">
+                                        Ver foto
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="small text-muted">—</span>
+                                }
+                            </td>
+                            <td><partial name="_BadgeEstado" model="inc.Estado.ToString()" /></td>
+                            <td class="text-end">
+                                <div class="d-inline-flex flex-wrap justify-content-end gap-1">
+                                    @if (inc.Estado == EstadoIncidencia.Abierta)
+                                    {
+                                        <form asp-action="Tomar" method="post" class="d-inline">
+                                            <input type="hidden" name="id" value="@inc.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-warning">Tomar</button>
+                                        </form>
+                                    }
+                                    @if (inc.Estado == EstadoIncidencia.Abierta || inc.Estado == EstadoIncidencia.EnProceso)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-success"
+                                                data-bs-toggle="modal" data-bs-target="#modalResolverInc-@inc.Id">
+                                            Resolver
+                                        </button>
+                                    }
+                                    @if (inc.Estado == EstadoIncidencia.Resuelta)
+                                    {
+                                        <form asp-action="Cerrar" method="post" class="d-inline">
+                                            <input type="hidden" name="id" value="@inc.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Cerrar</button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@foreach (var inc in lista)
+{
+    if (!string.IsNullOrWhiteSpace(inc.Foto))
+    {
+        <div class="modal fade" id="modalFotoInc-@inc.Id" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 class="modal-title h6 fw-bold text-sisph">Evidencia · Incidencia #@inc.Id</h3>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <img src="@inc.Foto" alt="@inc.Titulo" class="img-fluid rounded" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    if (inc.Estado == EstadoIncidencia.Abierta || inc.Estado == EstadoIncidencia.EnProceso)
+    {
+        <div class="modal fade" id="modalResolverInc-@inc.Id" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form asp-action="Resolver" method="post">
+                        <div class="modal-header">
+                            <h3 class="modal-title h6 fw-bold text-sisph">Resolver Incidencia #@inc.Id</h3>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" name="id" value="@inc.Id" />
+                            <p class="small text-muted mb-2"><strong>@inc.Titulo</strong></p>
+                            <label for="obsInc-@inc.Id" class="form-label small fw-semibold">Observación técnica *</label>
+                            <textarea id="obsInc-@inc.Id" name="observacionTecnica" class="form-control" rows="4" required maxlength="500"
+                                      placeholder="Describe el trabajo técnico realizado para resolver la incidencia..."></textarea>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-sm btn-success">Marcar como resuelta</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@section Scripts {
+    <script>
+        document.getElementById('selectEstadoInc')?.addEventListener('change', () => {
+            const form = document.getElementById('formFiltroIncidencias');
+            if (form instanceof HTMLFormElement) {
+                form.submit();
+            }
+        });
+    </script>
+}

@@ -1,0 +1,194 @@
+@model SisPH.Web.Models.RegistrarPagoViewModel
+@using SisPH.Entidades.Enums
+@using System.Globalization
+@{
+    ViewData["Title"] = "Registrar Pago";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Registrar Pago de Cuotas</h1>
+        <p class="text-muted small mb-0">Selecciona la unidad, las cuotas a abonar (permite abonos parciales) y genera el recibo firmado (CU-07)</p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Volver a pagos</a>
+</div>
+
+<div class="sisph-card p-4 mb-4">
+    <form method="get" id="formSeleccionarUnidad" class="row g-3 align-items-end">
+        <div class="col-md-6">
+            <label for="selectUnidadRegistrar" class="form-label small fw-semibold">1. Seleccionar unidad activa</label>
+            <select id="selectUnidadRegistrar" name="unidadId" class="form-select">
+                <option value="">-- Seleccione una unidad --</option>
+                @foreach (var u in Model.Unidades)
+                {
+                    <option value="@u.Id" selected="@(Model.UnidadId == u.Id)">
+                        @u.Torre?.Nombre - Unidad @u.Numero (Piso @u.Piso)
+                    </option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <button type="submit" class="btn btn-outline-primary">Cargar cuotas pendientes</button>
+        </div>
+    </form>
+</div>
+
+@if (Model.UnidadId.HasValue)
+{
+    if (Model.CuotasPendientes.Count == 0)
+    {
+        <div class="alert alert-success">
+            Esta unidad no tiene cuotas pendientes, vencidas ni morosas. Se encuentra a paz y salvo.
+        </div>
+    }
+    else
+    {
+        <form asp-action="Registrar" method="post" class="sisph-card p-4">
+            <input type="hidden" name="unidadId" value="@Model.UnidadId.Value" />
+
+            <h2 class="h6 fw-bold text-sisph mb-3">2. Selecciona una o varias cuotas a pagar</h2>
+            <div class="table-responsive mb-4">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 44px;">
+                                <input type="checkbox" id="chkTodasCuotas" class="form-check-input" title="Seleccionar todas" />
+                            </th>
+                            <th>Período</th>
+                            <th>Tipo</th>
+                            <th>Vencimiento</th>
+                            <th>Estado</th>
+                            <th class="text-end">Monto + Recargo</th>
+                            <th class="text-end">Ya pagado</th>
+                            <th class="text-end">Saldo pendiente</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in Model.CuotasPendientes)
+                        {
+                            var pagado = c.PagoDetalles.Sum(pd => pd.MontoAplicado);
+                            var saldo = Math.Max(0m, (c.Monto + c.Recargo) - pagado);
+                            bool marcada = Model.CuotaIdsSeleccionadas.Contains(c.Id);
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="cuotaIds" value="@c.Id"
+                                           class="form-check-input chk-cuota"
+                                           data-saldo="@saldo.ToString("0.00", CultureInfo.InvariantCulture)"
+                                           checked="@marcada" />
+                                </td>
+                                <td class="fw-semibold">@c.Periodo</td>
+                                <td class="small">@c.Tipo</td>
+                                <td class="small">@c.Vence.ToString("dd/MM/yyyy")</td>
+                                <td><partial name="_BadgeEstado" model="c.Estado.ToString()" /></td>
+                                <td class="text-end">$@((c.Monto + c.Recargo).ToString("N2"))</td>
+                                <td class="text-end text-success">$@pagado.ToString("N2")</td>
+                                <td class="text-end fw-bold text-danger">$@saldo.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bg-light border rounded p-3 mb-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <span class="small text-muted">Saldo total de cuotas seleccionadas:</span>
+                    <strong class="fs-5 text-sisph ms-2" id="lblSaldoSeleccionado">$0.00</strong>
+                </div>
+                <button type="button" id="btnAplicarSaldoTotal" class="btn btn-sm btn-outline-secondary">
+                    Copiar saldo seleccionado al monto
+                </button>
+            </div>
+
+            <h2 class="h6 fw-bold text-sisph mb-3">3. Detalles del pago</h2>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="inputMontoPagado" class="form-label small fw-semibold">Monto pagado ($) *</label>
+                    <input type="number" id="inputMontoPagado" name="montoPagado"
+                           value="@(Model.MontoPagado > 0 ? Model.MontoPagado.ToString("0.00", CultureInfo.InvariantCulture) : "")"
+                           step="0.01" min="0.01" class="form-control" required />
+                    <div class="form-text">Puede ser menor al saldo total (abono parcial), nunca mayor.</div>
+                </div>
+                <div class="col-md-4">
+                    <label for="selectMetodoPago" class="form-label small fw-semibold">Método de pago *</label>
+                    <select id="selectMetodoPago" name="metodo" class="form-select" required>
+                        @foreach (MetodoPago m in Enum.GetValues<MetodoPago>())
+                        {
+                            <option value="@m" selected="@(Model.Metodo == m)">@m</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="inputReferencia" class="form-label small fw-semibold">Referencia (opcional)</label>
+                    <input type="text" id="inputReferencia" name="referencia" value="@Model.Referencia"
+                           class="form-control" maxlength="100" placeholder="Ej. Comprobante ACH #4821" />
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex justify-content-end gap-2">
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-sisph px-4">Registrar pago y emitir recibo</button>
+            </div>
+        </form>
+    }
+}
+
+@section Scripts {
+    <script>
+        const selectUnidad = document.getElementById('selectUnidadRegistrar');
+        if (selectUnidad) {
+            selectUnidad.addEventListener('change', () => {
+                const form = document.getElementById('formSeleccionarUnidad');
+                if (form instanceof HTMLFormElement) {
+                    form.submit();
+                }
+            });
+        }
+
+        const checkboxes = Array.from(document.querySelectorAll('.chk-cuota'));
+        const lblSaldo = document.getElementById('lblSaldoSeleccionado');
+        const inputMonto = document.getElementById('inputMontoPagado');
+        const chkTodas = document.getElementById('chkTodasCuotas');
+
+        function calcularSaldoSeleccionado() {
+            let total = 0;
+            for (const el of checkboxes) {
+                if (el instanceof HTMLInputElement && el.checked) {
+                    const valor = parseFloat(el.dataset.saldo || '0');
+                    if (!Number.isNaN(valor)) {
+                        total += valor;
+                    }
+                }
+            }
+            if (lblSaldo) {
+                lblSaldo.textContent = '$' + total.toFixed(2);
+            }
+            return total;
+        }
+
+        for (const el of checkboxes) {
+            el.addEventListener('change', () => {
+                calcularSaldoSeleccionado();
+            });
+        }
+
+        if (chkTodas instanceof HTMLInputElement) {
+            chkTodas.addEventListener('change', () => {
+                for (const el of checkboxes) {
+                    if (el instanceof HTMLInputElement) {
+                        el.checked = chkTodas.checked;
+                    }
+                }
+                calcularSaldoSeleccionado();
+            });
+        }
+
+        document.getElementById('btnAplicarSaldoTotal')?.addEventListener('click', () => {
+            const total = calcularSaldoSeleccionado();
+            if (inputMonto instanceof HTMLInputElement && total > 0) {
+                inputMonto.value = total.toFixed(2);
+            }
+        });
+
+        calcularSaldoSeleccionado();
+    </script>
+}

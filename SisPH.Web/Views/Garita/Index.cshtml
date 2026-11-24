@@ -1,0 +1,167 @@
+@model SisPH.Web.Models.GaritaViewModel
+@{
+    ViewData["Title"] = "Control de Garita QR";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Control de Garita · Escáner de Pases QR</h1>
+        <p class="text-muted small mb-0">Valida tokens de visitantes de 32 caracteres para registrar entradas y salidas en tiempo real (CU-13)</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="sisph-card p-4 h-100">
+            <h2 class="h6 fw-bold text-sisph mb-3">Escanear o ingresar Token QR</h2>
+            <form asp-action="Escanear" method="post">
+                <div class="mb-3">
+                    <label for="inputTokenQr" class="form-label small fw-semibold">Código / Token QR (32 caracteres)</label>
+                    <input type="text" id="inputTokenQr" name="tokenQr"
+                           class="form-control form-control-lg font-monospace"
+                           placeholder="Escanea el QR o pega el token aquí..."
+                           maxlength="64" autocomplete="off" autofocus required />
+                </div>
+                <button type="submit" class="btn btn-sisph w-100 py-2">
+                    Validar acceso y registrar movimiento
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        @if (Model.HayResultadoEscaneo)
+        {
+            if (Model.AccesoPermitido && Model.PaseEscaneado is not null)
+            {
+                var p = Model.PaseEscaneado;
+                var unidad = p.Residente?.Ocupaciones.FirstOrDefault()?.Unidad;
+                <div class="sisph-card p-4 h-100 border-success" style="border-width: 2px;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="badge rounded-pill badge-soft-success fs-6 px-3 py-2">
+                            ACCESO PERMITIDO · @Model.TipoMovimiento?.ToUpperInvariant()
+                        </span>
+                        <span class="small text-muted">Pase #@p.Id</span>
+                    </div>
+                    <h2 class="h5 fw-bold text-sisph mb-2">@p.NombreVisitante</h2>
+                    <dl class="row small mb-0">
+                        <dt class="col-5 text-muted">Cédula visitante</dt>
+                        <dd class="col-7">@(string.IsNullOrWhiteSpace(p.CedulaVisitante) ? "No registrada" : p.CedulaVisitante)</dd>
+
+                        <dt class="col-5 text-muted">Autorizado por</dt>
+                        <dd class="col-7 fw-semibold">@(p.Residente?.NombreCompleto() ?? "—")</dd>
+
+                        <dt class="col-5 text-muted">Unidad destino</dt>
+                        <dd class="col-7 fw-bold text-sisph">
+                            @(unidad is not null ? $"{unidad.Torre?.Nombre} · Unidad {unidad.Numero}" : "Sin unidad asignada")
+                        </dd>
+
+                        <dt class="col-5 text-muted">Entrada</dt>
+                        <dd class="col-7">@(p.Entrada?.ToString("dd/MM/yyyy HH:mm:ss") ?? "—")</dd>
+
+                        <dt class="col-5 text-muted">Salida</dt>
+                        <dd class="col-7">@(p.Salida?.ToString("dd/MM/yyyy HH:mm:ss") ?? "En las instalaciones")</dd>
+                    </dl>
+                </div>
+            }
+            else
+            {
+                <div class="sisph-card p-4 h-100 border-danger" style="border-width: 2px;">
+                    <div class="mb-3">
+                        <span class="badge rounded-pill badge-soft-danger fs-6 px-3 py-2">
+                            ACCESO DENEGADO
+                        </span>
+                    </div>
+                    <h2 class="h5 fw-bold text-danger mb-2">Validación rechazada</h2>
+                    <p class="mb-0">@Model.MensajeEscaneo</p>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="sisph-card p-4 h-100 d-flex flex-column justify-content-center align-items-center text-center text-muted">
+                <div class="fw-semibold text-sisph mb-1">Listo para escanear</div>
+                <p class="small mb-0">
+                    Coloca el cursor en el campo de token y escanea el código QR del visitante. El primer escaneo marca la <strong>Entrada</strong> y el segundo marca la <strong>Salida</strong>.
+                </p>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="sisph-card overflow-hidden">
+    <div class="p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h2 class="h6 fw-bold text-sisph mb-0">Historial de Garita · @Model.FechaConsulta.ToString("dd/MM/yyyy")</h2>
+        <form method="get" id="formFechaGarita" class="d-flex align-items-center gap-2">
+            <label for="inputFechaGarita" class="small text-muted mb-0">Fecha:</label>
+            <input type="date" id="inputFechaGarita" name="fecha"
+                   value="@Model.FechaConsulta.ToString("yyyy-MM-dd")"
+                   class="form-control form-control-sm" style="max-width: 170px;" />
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Visitante</th>
+                    <th>Cédula</th>
+                    <th>Unidad destino</th>
+                    <th>Residente</th>
+                    <th>Vigente hasta</th>
+                    <th>Entrada</th>
+                    <th>Salida</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Historial.Count == 0)
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">No hay pases registrados para esta fecha.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var p in Model.Historial)
+                    {
+                        var unidad = p.Residente?.Ocupaciones.FirstOrDefault()?.Unidad;
+                        string estadoPase = p.Salida.HasValue
+                            ? "Usado"
+                            : p.Entrada.HasValue
+                                ? "En uso"
+                                : DateTime.Now > p.VigenteHasta
+                                    ? "Vencido"
+                                    : "Vigente";
+                        <tr>
+                            <td class="fw-semibold">@p.NombreVisitante</td>
+                            <td class="small text-muted">@(string.IsNullOrWhiteSpace(p.CedulaVisitante) ? "—" : p.CedulaVisitante)</td>
+                            <td class="small fw-semibold">
+                                @(unidad is not null ? $"{unidad.Torre?.Nombre} - {unidad.Numero}" : "—")
+                            </td>
+                            <td class="small">@(p.Residente?.NombreCompleto() ?? "—")</td>
+                            <td class="small">@p.VigenteHasta.ToString("dd/MM HH:mm")</td>
+                            <td class="small text-success">@(p.Entrada?.ToString("HH:mm:ss") ?? "—")</td>
+                            <td class="small text-muted">@(p.Salida?.ToString("HH:mm:ss") ?? "—")</td>
+                            <td><partial name="_BadgeEstado" model="estadoPase" /></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const inputToken = document.getElementById('inputTokenQr');
+        if (inputToken instanceof HTMLInputElement) {
+            inputToken.focus();
+        }
+        document.getElementById('inputFechaGarita')?.addEventListener('change', () => {
+            const form = document.getElementById('formFechaGarita');
+            if (form instanceof HTMLFormElement) {
+                form.submit();
+            }
+        });
+    </script>
+}

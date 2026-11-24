@@ -1,0 +1,67 @@
+﻿@model SisPH.Entidades.Entidades.AreaSocial
+@{
+    ViewData["Title"] = "Editar Área Social";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="sisph-card p-4">
+            <h1 class="h5 fw-bold text-sisph mb-3">Editar Área Social: @Model.Nombre</h1>
+            <form asp-action="Editar" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <div class="row g-3 mb-3">
+                    <div class="col-md-8">
+                        <label class="form-label small fw-semibold">Nombre</label>
+                        <input type="text" name="nombre" value="@Model.Nombre" class="form-control" required maxlength="50" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Capacidad</label>
+                        <input type="number" name="capacidad" value="@Model.Capacidad" class="form-control" min="1" required />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Descripción</label>
+                    <textarea name="descripcion" class="form-control" rows="2" maxlength="500">@Model.Descripcion</textarea>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Apertura</label>
+                        <input type="time" name="horaApertura" value="@Model.HoraApertura.ToString(@"hh\:mm")" class="form-control" required />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Cierre</label>
+                        <input type="time" name="horaCierre" value="@Model.HoraCierre.ToString(@"hh\:mm")" class="form-control" required />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Costo ($)</label>
+                        <input type="number" step="0.01" min="0" name="costo" value="@Model.Costo.ToString(System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Depósito ($)</label>
+                        <input type="number" step="0.01" min="0" name="deposito" value="@Model.Deposito.ToString(System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required />
+                    </div>
+                </div>
+                @if (Model.Imagenes.Any())
+                {
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Seleccionar imagen principal actual</label>
+                        <select name="imagenPrincipalId" class="form-select">
+                            @foreach (var img in Model.Imagenes)
+                            {
+                                <option value="@img.Id" selected="@img.EsPrincipal">Imagen #@img.Id (@System.IO.Path.GetFileName(img.Ruta))</option>
+                            }
+                        </select>
+                    </div>
+                }
+                <div class="mb-4">
+                    <label class="form-label small fw-semibold">Agregar imágenes adicionales (opcional)</label>
+                    <input type="file" name="nuevasImagenes" class="form-control" multiple accept=".jpg,.jpeg,.png,.webp" />
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-sisph">Guardar cambios</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Volver</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

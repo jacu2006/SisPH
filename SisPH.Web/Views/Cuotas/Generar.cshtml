@@ -1,0 +1,113 @@
+@model SisPH.Web.Models.CuotasGenerarViewModel
+@using SisPH.Entidades.Enums
+@{
+    ViewData["Title"] = "Generar Cuotas";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Generar Cuotas por Período</h1>
+        <p class="text-muted small mb-0">Calcula el prorrateo por coeficiente de participación y valida la vista previa antes de confirmar (CU-06)</p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Volver a cuotas</a>
+</div>
+
+<div class="sisph-card p-4 mb-4">
+    <form asp-action="Generar" method="post" class="row g-3">
+        <div class="col-md-3">
+            <label asp-for="Periodo" class="form-label small fw-semibold">Período (AAAA-MM)</label>
+            <input asp-for="Periodo" class="form-control" placeholder="2026-11" maxlength="7" pattern="\d{4}-\d{2}" required />
+            <div class="form-text">Formato obligatorio AAAA-MM.</div>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="Tipo" class="form-label small fw-semibold">Tipo de cuota</label>
+            <select asp-for="Tipo" class="form-select">
+                @foreach (TipoCuota t in Enum.GetValues<TipoCuota>())
+                {
+                    <option value="@t">@t</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="Presupuesto" class="form-label small fw-semibold">Presupuesto / Monto total ($)</label>
+            <input asp-for="Presupuesto" type="number" step="0.01" min="0.01" class="form-control" required />
+        </div>
+        <div class="col-md-3">
+            <label asp-for="FechaVencimiento" class="form-label small fw-semibold">Fecha de vencimiento (opcional)</label>
+            <input asp-for="FechaVencimiento" type="date" class="form-control" />
+            <div class="form-text">Si se omite, el SP asigna el día 10 del mes.</div>
+        </div>
+        <div class="col-12 d-flex justify-content-end gap-2">
+            <button type="submit" name="accion" value="previa" class="btn btn-outline-primary">
+                Generar vista previa
+            </button>
+        </div>
+    </form>
+</div>
+
+@if (Model.VistaPrevia is not null && Model.VistaPrevia.Count > 0)
+{
+    var grupos = Model.VistaPrevia.GroupBy(i => i.Torre).OrderBy(g => g.Key).ToList();
+    var totalGeneral = Model.VistaPrevia.Sum(i => i.MontoCalculado);
+
+    <div class="sisph-card p-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h2 class="h5 fw-bold text-sisph mb-0">
+                    Vista Previa · Período @Model.Periodo (@Model.Tipo)
+                </h2>
+                <p class="small text-muted mb-0">
+                    @Model.VistaPrevia.Count unidades activas · Total calculado: <strong>$@totalGeneral.ToString("N2")</strong>
+                </p>
+            </div>
+            <form asp-action="Generar" method="post">
+                <input type="hidden" name="Periodo" value="@Model.Periodo" />
+                <input type="hidden" name="Tipo" value="@Model.Tipo" />
+                <input type="hidden" name="Presupuesto" value="@Model.Presupuesto.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                <input type="hidden" name="FechaVencimiento" value="@Model.FechaVencimiento?.ToString("yyyy-MM-dd")" />
+                <button type="submit" name="accion" value="confirmar" class="btn btn-sisph">
+                    Confirmar y generar @Model.VistaPrevia.Count cuotas
+                </button>
+            </form>
+        </div>
+
+        <div class="row g-3">
+            @foreach (var grupo in grupos)
+            {
+                var subtotalTorre = grupo.Sum(x => x.MontoCalculado);
+                var coefTorre = grupo.Sum(x => x.Coeficiente);
+                <div class="col-lg-6">
+                    <div class="border rounded overflow-hidden">
+                        <div class="bg-light px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                            <strong class="text-sisph">@grupo.Key</strong>
+                            <span class="small text-muted">
+                                @grupo.Count() unidades · Coef: @coefTorre.ToString("0.####")% · Subtotal: <strong>$@subtotalTorre.ToString("N2")</strong>
+                            </span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Unidad</th>
+                                        <th class="text-end">Coeficiente</th>
+                                        <th class="text-end">Cuota calculada</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in grupo)
+                                    {
+                                        <tr>
+                                            <td class="fw-semibold">@item.NumeroUnidad</td>
+                                            <td class="text-end small">@item.Coeficiente.ToString("0.####") %</td>
+                                            <td class="text-end fw-bold">$@item.MontoCalculado.ToString("N2")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}

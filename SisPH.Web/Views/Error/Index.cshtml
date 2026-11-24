@@ -1,0 +1,18 @@
+﻿@{
+    ViewData["Title"] = "Error inesperado";
+}
+<div class="container py-5">
+    <div class="sisph-card p-5 mx-auto text-center" style="max-width: 540px;">
+        <h1 class="h4 fw-bold text-danger mb-2">Ocurrió un inconveniente al procesar tu solicitud</h1>
+        <p class="text-muted small mb-3">
+            El incidente ha sido registrado automáticamente para su revisión técnica. No se muestran detalles internos por seguridad.
+        </p>
+        @if ((long)(ViewBag.RefId ?? 0L) > 0)
+        {
+            <div class="alert alert-light border small mb-3">
+                Código de referencia: <strong>#ERR-@ViewBag.RefId</strong>
+            </div>
+        }
+        <a asp-controller="Home" asp-action="Index" class="btn btn-sisph">Volver al inicio</a>
+    </div>
+</div>

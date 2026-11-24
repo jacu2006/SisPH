@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\SisPH.Entidades\SisPH.Entidades.csproj" />
+    <ProjectReference Include="..\SisPH.Negocio\SisPH.Negocio.csproj" />
+    <ProjectReference Include="..\SisPH.Seguridad\SisPH.Seguridad.csproj" />
+    <ProjectReference Include="..\SisPH.Datos\SisPH.Datos.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" Version="11.0.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>d1812d1b-8e82-4e42-aa80-ce781e1500fe</UserSecretsId>
+  </PropertyGroup>
+
+</Project>

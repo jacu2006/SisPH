@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="SisPH.Datos/SisPH.Datos.csproj" />
+  <Project Path="SisPH.Entidades/SisPH.Entidades.csproj" />
+  <Project Path="SisPH.Negocio/SisPH.Negocio.csproj" />
+  <Project Path="SisPH.Seguridad/SisPH.Seguridad.csproj" />
+  <Project Path="SisPH.Web/SisPH.Web.csproj" />
+</Solution>

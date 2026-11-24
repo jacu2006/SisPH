@@ -1,0 +1,21 @@
+﻿@model SisPH.Entidades.Entidades.AreaSocial
+@{
+    ViewData["Title"] = Model.Nombre;
+}
+
+<div class="sisph-card p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h4 fw-bold text-sisph mb-1">@Model.Nombre</h1>
+            <p class="text-muted small mb-0">
+                Capacidad: @Model.Capacidad personas · Horario: @Model.HoraApertura.ToString(@"hh\:mm") a @Model.HoraCierre.ToString(@"hh\:mm") · Costo: $@Model.Costo.ToString("0.00")
+            </p>
+        </div>
+        <a asp-action="Index" class="btn btn-sm btn-outline-secondary">← Volver</a>
+    </div>
+
+    <p class="mb-4">@Model.Descripcion</p>
+
+    <h2 class="h6 fw-bold text-sisph mb-3">Galería de Imágenes</h2>
+    <partial name="_GaleriaImagenes" model="Model.Imagenes" />
+</div>

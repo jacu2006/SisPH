@@ -1,0 +1,12 @@
+﻿@model string
+@{
+    var estado = Model ?? string.Empty;
+    var clase = estado switch
+    {
+        "Pagada" or "Aprobada" or "Usada" or "Resuelta" or "A paz y salvo" or "Vigente" or "Activo" => "badge-soft-success",
+        "Pendiente" or "Solicitada" or "EnProceso" or "En proceso" => "badge-soft-warning",
+        "Vencida" or "Morosa" or "Rechazada" or "Alterada" or "Inactivo" => "badge-soft-danger",
+        _ => "badge-soft-neutral"
+    };
+}
+<span class="badge rounded-pill @clase px-3 py-1">@estado</span>

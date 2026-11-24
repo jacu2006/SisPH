@@ -1,0 +1,98 @@
+@model SisPH.Web.Models.RegistrarMudanzaViewModel
+@using SisPH.Entidades.Enums
+@{
+    ViewData["Title"] = "Registrar Mudanza";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Registrar Mudanza</h1>
+        <p class="text-muted small mb-0">El sistema bloquea automáticamente la autorización si la unidad tiene cuotas vencidas o morosas (CU-14 / CU-19)</p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Volver a mudanzas</a>
+</div>
+
+<div class="sisph-card p-4" style="max-width: 720px;">
+    <form asp-action="Registrar" method="post">
+        <div class="row g-3 mb-3">
+            <div class="col-md-7">
+                <label for="selectUnidadM" class="form-label small fw-semibold">Unidad activa *</label>
+                <select id="selectUnidadM" name="unidadId" class="form-select" required>
+                    <option value="">-- Seleccione una unidad --</option>
+                    @foreach (var u in Model.Unidades)
+                    {
+                        <option value="@u.Id" selected="@(Model.UnidadId == u.Id)">
+                            @u.Torre?.Nombre - Unidad @u.Numero (Piso @u.Piso)
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label for="selectTipoMudanza" class="form-label small fw-semibold">Tipo de mudanza *</label>
+                <select id="selectTipoMudanza" name="tipo" class="form-select" required>
+                    @foreach (TipoMudanza t in Enum.GetValues<TipoMudanza>())
+                    {
+                        <option value="@t" selected="@(Model.Tipo == t)">@t</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div id="bloqueEntrada" class="row g-3 mb-3 p-3 bg-light border rounded">
+            <div class="col-md-7">
+                <label for="selectResidenteEntrada" class="form-label small fw-semibold">Residente que ingresa *</label>
+                <select id="selectResidenteEntrada" name="residenteIdEntrada" class="form-select">
+                    <option value="">-- Seleccione el residente --</option>
+                    @foreach (var r in Model.Residentes)
+                    {
+                        <option value="@r.Id" selected="@(Model.ResidenteIdEntrada == r.Id)">
+                            @r.NombreCompleto() (@r.Cedula)
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label for="selectTipoOcupacion" class="form-label small fw-semibold">Tipo de ocupación</label>
+                <select id="selectTipoOcupacion" name="tipoOcupacionEntrada" class="form-select">
+                    @foreach (TipoOcupacion occ in Enum.GetValues<TipoOcupacion>())
+                    {
+                        <option value="@occ" selected="@(Model.TipoOcupacionEntrada == occ)">@occ</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <label for="inputObsMudanza" class="form-label small fw-semibold">Observación (opcional)</label>
+            <textarea id="inputObsMudanza" name="observacion" class="form-control" rows="3" maxlength="300"
+                      placeholder="Ej. Mudanza autorizada en horario de 8:00 a 16:00, elevador de carga reservado.">@Model.Observacion</textarea>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-sisph px-4">Validar paz y salvo y registrar</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        const selectTipo = document.getElementById('selectTipoMudanza');
+        const bloqueEntrada = document.getElementById('bloqueEntrada');
+        const selectResidente = document.getElementById('selectResidenteEntrada');
+
+        function actualizarCamposEntrada() {
+            if (!(selectTipo instanceof HTMLSelectElement) || !bloqueEntrada) {
+                return;
+            }
+            const esEntrada = selectTipo.value === 'Entrada';
+            bloqueEntrada.classList.toggle('d-none', !esEntrada);
+            if (selectResidente instanceof HTMLSelectElement) {
+                selectResidente.required = esEntrada;
+            }
+        }
+
+        selectTipo?.addEventListener('change', actualizarCamposEntrada);
+        actualizarCamposEntrada();
+    </script>
+}

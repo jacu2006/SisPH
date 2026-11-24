@@ -1,0 +1,100 @@
+@model IEnumerable<SisPH.Entidades.Entidades.Incidencia>
+@using SisPH.Entidades.Enums
+@{
+    ViewData["Title"] = "Mis Incidencias";
+    var lista = Model.ToList();
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Mis Incidencias Reportadas</h1>
+        <p class="text-muted small mb-0">Da seguimiento a tus reportes de mantenimiento, confirma la solución o reabre el caso (CU-10)</p>
+    </div>
+    <a asp-action="Reportar" class="btn btn-sisph">+ Reportar incidencia</a>
+</div>
+
+@if (lista.Count == 0)
+{
+    <div class="sisph-card p-5 text-center text-muted">
+        Aún no has reportado incidencias.
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var inc in lista)
+        {
+            <div class="col-md-6">
+                <div class="sisph-card p-4 h-100 d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <div>
+                            <h2 class="h6 fw-bold text-sisph mb-0">@inc.Titulo</h2>
+                            <div class="small text-muted">Reporte #@inc.Id · @inc.Fecha.ToString("dd/MM/yyyy HH:mm")</div>
+                        </div>
+                        <partial name="_BadgeEstado" model="inc.Estado.ToString()" />
+                    </div>
+
+                    <p class="small mb-3">@inc.Descripcion</p>
+
+                    @if (!string.IsNullOrWhiteSpace(inc.Foto))
+                    {
+                        <div class="mb-3">
+                            <img src="@inc.Foto" alt="@inc.Titulo" class="img-fluid rounded border" style="max-height: 180px; object-fit: cover;" />
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(inc.ObservacionTecnica))
+                    {
+                        <div class="small p-2 bg-light border rounded mb-3">
+                            <strong class="text-sisph">Respuesta técnica:</strong> @inc.ObservacionTecnica
+                        </div>
+                    }
+
+                    <div class="mt-auto pt-2 border-top d-flex flex-wrap justify-content-end gap-2">
+                        @if (inc.Estado == EstadoIncidencia.Resuelta)
+                        {
+                            <form asp-action="Cerrar" method="post" class="d-inline">
+                                <input type="hidden" name="id" value="@inc.Id" />
+                                <button type="submit" class="btn btn-sm btn-success">Confirmar y Cerrar</button>
+                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-warning"
+                                    data-bs-toggle="modal" data-bs-target="#modalReabrirInc-@inc.Id">
+                                Reabrir
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="small text-muted">Sin acciones pendientes</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @foreach (var inc in lista.Where(x => x.Estado == EstadoIncidencia.Resuelta))
+    {
+        <div class="modal fade" id="modalReabrirInc-@inc.Id" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form asp-action="Reabrir" method="post">
+                        <div class="modal-header">
+                            <h3 class="modal-title h6 fw-bold text-sisph">Reabrir Incidencia #@inc.Id</h3>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" name="id" value="@inc.Id" />
+                            <label for="motivoReabrir-@inc.Id" class="form-label small fw-semibold">Motivo de reapertura *</label>
+                            <textarea id="motivoReabrir-@inc.Id" name="motivoReapertura" class="form-control" rows="3" required maxlength="300"
+                                      placeholder="Indica por qué el problema aún no está resuelto..."></textarea>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-sm btn-warning">Confirmar reapertura</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+}

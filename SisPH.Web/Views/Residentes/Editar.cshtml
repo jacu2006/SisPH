@@ -1,0 +1,48 @@
+﻿@model SisPH.Entidades.Entidades.Residente
+@{
+    ViewData["Title"] = "Editar Residente";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="sisph-card p-4">
+            <h1 class="h5 fw-bold text-sisph mb-3">Editar Residente</h1>
+
+            <form asp-action="Editar" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Cédula</label>
+                        <input type="text" name="cedula" value="@Model.Cedula" class="form-control" required maxlength="20" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Nombre</label>
+                        <input type="text" name="nombre" value="@Model.Nombre" class="form-control" required maxlength="60" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Apellido</label>
+                        <input type="text" name="apellido" value="@Model.Apellido" class="form-control" required maxlength="60" />
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Correo</label>
+                        <input type="email" name="correo" value="@Model.Correo" class="form-control" required maxlength="120" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Teléfono</label>
+                        <input type="text" name="telefono" value="@Model.Telefono" class="form-control" maxlength="20" />
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label small fw-semibold">Actualizar fotografía (opcional, máx. 2 MB)</label>
+                    <input type="file" name="nuevaFoto" class="form-control" accept=".jpg,.jpeg,.png,.webp" />
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-sisph">Guardar cambios</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Volver</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

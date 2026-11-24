@@ -1,0 +1,154 @@
+@model SisPH.Web.Models.PresupuestoViewModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "Presupuesto y Proyección Quinquenal";
+    decimal totalIngresos = Model.Lineas.Where(l => l.Tipo == "Ingreso").Sum(l => l.MontoProyectado);
+    decimal totalGastos = Model.Lineas.Where(l => l.Tipo == "Gasto").Sum(l => l.MontoProyectado);
+    decimal balanceAnual = totalIngresos - totalGastos;
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Presupuesto Anual y Proyección Quinquenal</h1>
+        <p class="text-muted small mb-0">Planificación financiera de ingresos, gastos y proyección a 5 años (CU-21)</p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Volver a reportes</a>
+</div>
+
+<div class="sisph-card p-3 mb-4">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-sm-4 col-md-3">
+            <label for="inputAnioBase" class="form-label small fw-semibold mb-1">Año base</label>
+            <input type="number" id="inputAnioBase" name="anio" value="@Model.AnioBase" min="2000" max="2100"
+                   class="form-control form-control-sm" required />
+        </div>
+        <div class="col-sm-4 col-md-3">
+            <label for="inputTasa" class="form-label small fw-semibold mb-1">Incremento anual estimado (%)</label>
+            <input type="number" id="inputTasa" name="tasa"
+                   value="@Model.TasaIncrementoPct.ToString("0.##", CultureInfo.InvariantCulture)"
+                   step="0.1" min="0" max="50" class="form-control form-control-sm" required />
+        </div>
+        <div class="col-sm-4 col-md-3">
+            <button type="submit" class="btn btn-sm btn-sisph">Consultar año / Recalcular</button>
+        </div>
+    </form>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-5">
+        <div class="sisph-card p-4 h-100">
+            <h2 class="h6 fw-bold text-sisph mb-3">Agregar Partida al Presupuesto @Model.AnioBase</h2>
+            <form asp-action="GuardarPresupuesto" method="post">
+                <input type="hidden" name="anio" value="@Model.AnioBase" />
+                <input type="hidden" name="tasa" value="@Model.TasaIncrementoPct.ToString("0.##", CultureInfo.InvariantCulture)" />
+
+                <div class="mb-3">
+                    <label for="selectTipoLinea" class="form-label small fw-semibold">Tipo *</label>
+                    <select id="selectTipoLinea" name="tipo" class="form-select" required>
+                        <option value="Ingreso">Ingreso</option>
+                        <option value="Gasto">Gasto</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="inputConcepto" class="form-label small fw-semibold">Concepto *</label>
+                    <input type="text" id="inputConcepto" name="concepto" class="form-control"
+                           required maxlength="150" placeholder="Ej. Cuotas ordinarias / Mantenimiento elevadores" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="inputMontoProy" class="form-label small fw-semibold">Monto proyectado anual ($) *</label>
+                    <input type="number" id="inputMontoProy" name="montoProyectado"
+                           step="0.01" min="0" class="form-control" required />
+                </div>
+
+                <button type="submit" class="btn btn-sisph w-100">Guardar partida</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="sisph-card overflow-hidden h-100">
+            <div class="p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h2 class="h6 fw-bold text-sisph mb-0">Partidas Registradas · Año @Model.AnioBase</h2>
+                <div class="small">
+                    <span class="text-success fw-semibold me-2">Ing: $@totalIngresos.ToString("N2")</span>
+                    <span class="text-danger fw-semibold me-2">Gas: $@totalGastos.ToString("N2")</span>
+                    <span class="fw-bold @(balanceAnual >= 0 ? "text-sisph" : "text-danger")">
+                        Bal: $@balanceAnual.ToString("N2")
+                    </span>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Concepto</th>
+                            <th class="text-end">Monto proyectado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Lineas.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-4">
+                                    No hay partidas presupuestarias registradas para @Model.AnioBase.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var linea in Model.Lineas)
+                            {
+                                <tr>
+                                    <td>
+                                        <span class="badge rounded-pill @(linea.Tipo == "Ingreso" ? "badge-soft-success" : "badge-soft-danger") px-3 py-1">
+                                            @linea.Tipo
+                                        </span>
+                                    </td>
+                                    <td class="fw-semibold">@linea.Concepto</td>
+                                    <td class="text-end fw-bold">$@linea.MontoProyectado.ToString("N2")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="sisph-card overflow-hidden">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <h2 class="h6 fw-bold text-sisph mb-0">
+            Proyección Quinquenal (5 años · Incremento anual @Model.TasaIncrementoPct.ToString("0.##")%)
+        </h2>
+        <span class="small text-muted">Base: @Model.AnioBase - @(Model.AnioBase + 4)</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Año</th>
+                    <th class="text-end">Ingresos proyectados</th>
+                    <th class="text-end">Gastos proyectados</th>
+                    <th class="text-end">Balance neto</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var proy in Model.ProyeccionQuinquenal)
+                {
+                    <tr>
+                        <td class="fw-bold text-sisph">@proy.Anio</td>
+                        <td class="text-end text-success fw-semibold">$@proy.IngresosProyectados.ToString("N2")</td>
+                        <td class="text-end text-danger fw-semibold">$@proy.GastosProyectados.ToString("N2")</td>
+                        <td class="text-end fw-bold @(proy.BalanceNeto >= 0 ? "text-sisph" : "text-danger")">
+                            $@proy.BalanceNeto.ToString("N2")
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

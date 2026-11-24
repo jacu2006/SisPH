@@ -1,0 +1,135 @@
+@model IEnumerable<SisPH.Entidades.Entidades.Cuota>
+@using SisPH.Entidades.Entidades
+@using SisPH.Entidades.Enums
+@{
+    ViewData["Title"] = "Gestión de Cuotas";
+    var torres = ViewBag.Torres as List<Torre> ?? new();
+    string? periodoActual = ViewBag.PeriodoActual as string;
+    int? torreSel = ViewBag.TorreSeleccionada as int?;
+    EstadoCuota? estadoSel = ViewBag.EstadoSeleccionado as EstadoCuota?;
+    var lista = Model.ToList();
+    decimal totalFacturado = lista.Sum(c => c.Monto + c.Recargo);
+    decimal totalSaldo = lista.Sum(c => Math.Max(0m, (c.Monto + c.Recargo) - c.PagoDetalles.Sum(pd => pd.MontoAplicado)));
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Cuotas de Mantenimiento</h1>
+        <p class="text-muted small mb-0">Emisión por coeficiente de participación, recargos y control de morosidad (CU-06)</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <form asp-action="ActualizarEstados" method="post" class="d-inline">
+            <button type="submit" class="btn btn-outline-warning btn-sm px-3 py-2">
+                Actualizar estados y recargos (10%)
+            </button>
+        </form>
+        <a asp-action="Generar" class="btn btn-sisph">+ Generar cuotas</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="sisph-card p-3">
+            <div class="small text-muted">Cuotas listadas</div>
+            <div class="fs-4 fw-bold text-sisph">@lista.Count</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="sisph-card p-3">
+            <div class="small text-muted">Total facturado (incl. recargos)</div>
+            <div class="fs-4 fw-bold text-sisph">$@totalFacturado.ToString("N2")</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="sisph-card p-3">
+            <div class="small text-muted">Saldo pendiente</div>
+            <div class="fs-4 fw-bold @(totalSaldo > 0 ? "text-danger" : "text-success")">$@totalSaldo.ToString("N2")</div>
+        </div>
+    </div>
+</div>
+
+<div class="sisph-card p-3 mb-3">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-sm-6 col-md-3">
+            <label for="filtroPeriodo" class="form-label small fw-semibold mb-1">Período (AAAA-MM)</label>
+            <input type="text" id="filtroPeriodo" name="periodo" value="@periodoActual"
+                   class="form-control form-control-sm" placeholder="Ej. 2026-11" maxlength="7" />
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <label for="filtroTorre" class="form-label small fw-semibold mb-1">Torre</label>
+            <select id="filtroTorre" name="torreId" class="form-select form-select-sm">
+                <option value="">Todas las torres</option>
+                @foreach (var t in torres)
+                {
+                    <option value="@t.Id" selected="@(torreSel == t.Id)">@t.Nombre</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <label for="filtroEstado" class="form-label small fw-semibold mb-1">Estado</label>
+            <select id="filtroEstado" name="estado" class="form-select form-select-sm">
+                <option value="">Todos los estados</option>
+                @foreach (EstadoCuota est in Enum.GetValues<EstadoCuota>())
+                {
+                    <option value="@est" selected="@(estadoSel == est)">@est</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-6 col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-sisph flex-grow-1">Filtrar</button>
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+        </div>
+    </form>
+</div>
+
+<div class="sisph-card overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Período</th>
+                    <th>Torre / Unidad</th>
+                    <th>Tipo</th>
+                    <th class="text-end">Monto</th>
+                    <th class="text-end">Recargo</th>
+                    <th class="text-end">Pagado</th>
+                    <th class="text-end">Saldo pendiente</th>
+                    <th>Vencimiento</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (lista.Count == 0)
+                {
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            No se encontraron cuotas con los filtros aplicados.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var c in lista)
+                    {
+                        var pagado = c.PagoDetalles.Sum(pd => pd.MontoAplicado);
+                        var saldo = Math.Max(0m, (c.Monto + c.Recargo) - pagado);
+                        <tr>
+                            <td class="fw-semibold">@c.Periodo</td>
+                            <td>
+                                <span class="text-muted small">@c.Unidad?.Torre?.Nombre</span> ·
+                                <strong>@c.Unidad?.Numero</strong>
+                            </td>
+                            <td class="small">@c.Tipo</td>
+                            <td class="text-end">$@c.Monto.ToString("N2")</td>
+                            <td class="text-end text-muted">$@c.Recargo.ToString("N2")</td>
+                            <td class="text-end text-success">$@pagado.ToString("N2")</td>
+                            <td class="text-end fw-bold @(saldo > 0 ? "text-danger" : "text-success")">$@saldo.ToString("N2")</td>
+                            <td class="small">@c.Vence.ToString("dd/MM/yyyy")</td>
+                            <td><partial name="_BadgeEstado" model="c.Estado.ToString()" /></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

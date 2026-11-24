@@ -1,0 +1,41 @@
+@{
+    ViewData["Title"] = "Reportar Incidencia";
+    string? titulo = ViewBag.Titulo as string;
+    string? descripcion = ViewBag.Descripcion as string;
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Reportar Nueva Incidencia</h1>
+        <p class="text-muted small mb-0">Describe el problema en tu unidad o áreas comunes y adjunta evidencia fotográfica opcional (CU-10)</p>
+    </div>
+    <a asp-action="MisIncidencias" class="btn btn-outline-secondary btn-sm">Volver a mis incidencias</a>
+</div>
+
+<div class="sisph-card p-4" style="max-width: 720px;">
+    <form asp-action="Reportar" method="post" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="inputTituloInc" class="form-label small fw-semibold">Título *</label>
+            <input type="text" id="inputTituloInc" name="titulo" value="@titulo"
+                   class="form-control" required maxlength="150"
+                   placeholder="Ej. Fuga de agua en pasillo del piso 5" />
+        </div>
+
+        <div class="mb-3">
+            <label for="inputDescInc" class="form-label small fw-semibold">Descripción detallada *</label>
+            <textarea id="inputDescInc" name="descripcion" class="form-control" rows="4" required maxlength="1000"
+                      placeholder="Explica ubicación exacta, horario y detalles relevantes...">@descripcion</textarea>
+        </div>
+
+        <div class="mb-4">
+            <label for="inputFotoInc" class="form-label small fw-semibold">Fotografía de evidencia (opcional · máx. 2 MB)</label>
+            <input type="file" id="inputFotoInc" name="foto" class="form-control" accept=".jpg,.jpeg,.png,.webp" />
+            <div class="form-text">Formatos admitidos: JPG, PNG o WEBP hasta 2 MB.</div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <a asp-action="MisIncidencias" class="btn btn-outline-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-sisph px-4">Enviar reporte</button>
+        </div>
+    </form>
+</div>

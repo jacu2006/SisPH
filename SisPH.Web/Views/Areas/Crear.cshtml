@@ -1,0 +1,59 @@
+﻿@{
+    ViewData["Title"] = "Nueva Área Social";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="sisph-card p-4">
+            <h1 class="h5 fw-bold text-sisph mb-3">Registrar Área Social</h1>
+            <form asp-action="Crear" method="post" enctype="multipart/form-data">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-8">
+                        <label class="form-label small fw-semibold">Nombre del área</label>
+                        <input type="text" name="nombre" class="form-control" required maxlength="50" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Capacidad máxima</label>
+                        <input type="number" name="capacidad" class="form-control" min="1" required />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Descripción y reglas de uso</label>
+                    <textarea name="descripcion" class="form-control" rows="2" maxlength="500"></textarea>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Hora apertura</label>
+                        <input type="time" name="horaApertura" value="08:00" class="form-control" required />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Hora cierre</label>
+                        <input type="time" name="horaCierre" value="22:00" class="form-control" required />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Costo ($)</label>
+                        <input type="number" step="0.01" min="0" name="costo" value="0" class="form-control" required />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Depósito ($)</label>
+                        <input type="number" step="0.01" min="0" name="deposito" value="0" class="form-control" required />
+                    </div>
+                </div>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-8">
+                        <label class="form-label small fw-semibold">Imágenes (mínimo 2 imágenes · máx. 2 MB cada una)</label>
+                        <input type="file" name="imagenes" class="form-control" multiple accept=".jpg,.jpeg,.png,.webp" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Imagen principal (índice 0, 1...)</label>
+                        <input type="number" name="indicePrincipal" value="0" min="0" class="form-control" />
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-sisph">Guardar área social</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,103 @@
+@model SisPH.Negocio.Interfaces.PaseGeneradoDto?
+@{
+    ViewData["Title"] = "Generar Pase de Visita QR";
+    string? nombreVisitante = ViewBag.NombreVisitante as string;
+    string? cedulaVisitante = ViewBag.CedulaVisitante as string;
+    string vigenteDefault = ViewBag.VigenteHastaDefault as string ?? DateTime.Now.AddHours(4).ToString("yyyy-MM-ddTHH:mm");
+    string minFecha = DateTime.Now.ToString("yyyy-MM-ddTHH:mm");
+    string maxFecha = DateTime.Now.AddHours(24).ToString("yyyy-MM-ddTHH:mm");
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Generar Pase de Visita QR</h1>
+        <p class="text-muted small mb-0">Crea un pase temporal válido hasta por 24 horas para compartirlo con tu visitante (CU-12)</p>
+    </div>
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Volver a mis pases</a>
+</div>
+
+@if (Model is not null)
+{
+    <div class="sisph-card p-4 mx-auto text-center" style="max-width: 540px;">
+        <span class="badge rounded-pill badge-soft-success px-3 py-1 mb-2">Pase QR Generado</span>
+        <h2 class="h5 fw-bold text-sisph mb-1">@Model.Pase.NombreVisitante</h2>
+        @if (!string.IsNullOrWhiteSpace(Model.Pase.CedulaVisitante))
+        {
+            <div class="small text-muted mb-1">Cédula / ID: @Model.Pase.CedulaVisitante</div>
+        }
+        <div class="small text-muted mb-3">
+            Vigente hasta: <strong>@Model.Pase.VigenteHasta.ToString("dd/MM/yyyy HH:mm")</strong>
+        </div>
+
+        <div class="mb-3">
+            <img src="@Model.QrBase64"
+                 alt="Código QR del pase de visita"
+                 class="img-fluid border rounded p-3 bg-white"
+                 style="max-width: 240px;" />
+        </div>
+
+        <div class="text-start bg-light border rounded p-3 mb-3">
+            <div class="small text-muted mb-1">Token QR (32 caracteres) para garita:</div>
+            <div class="d-flex align-items-center justify-content-between gap-2">
+                <code id="txtTokenPase" class="text-sisph fw-bold text-break">@Model.Pase.TokenQR</code>
+                <button type="button" id="btnCopiarToken" class="btn btn-sm btn-outline-primary flex-shrink-0">Copiar</button>
+            </div>
+            <div id="lblCopiado" class="small text-success mt-1 d-none">Token copiado al portapapeles.</div>
+        </div>
+
+        <div class="d-flex flex-wrap justify-content-center gap-2">
+            <a asp-action="DescargarQr" asp-route-id="@Model.Pase.Id" class="btn btn-sisph">Descargar QR (PNG)</a>
+            <a asp-action="Crear" class="btn btn-outline-primary">Generar otro pase</a>
+            <a asp-action="Index" class="btn btn-outline-secondary">Ver todos mis pases</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="sisph-card p-4" style="max-width: 620px;">
+        <form asp-action="Crear" method="post">
+            <div class="mb-3">
+                <label for="inputNombreVis" class="form-label small fw-semibold">Nombre completo del visitante *</label>
+                <input type="text" id="inputNombreVis" name="nombreVisitante" value="@nombreVisitante"
+                       class="form-control" required maxlength="120" placeholder="Ej. Carlos Mendoza" />
+            </div>
+
+            <div class="mb-3">
+                <label for="inputCedulaVis" class="form-label small fw-semibold">Cédula o pasaporte (opcional)</label>
+                <input type="text" id="inputCedulaVis" name="cedulaVisitante" value="@cedulaVisitante"
+                       class="form-control" maxlength="30" placeholder="Ej. 8-888-1234" />
+            </div>
+
+            <div class="mb-4">
+                <label for="inputVigenteHasta" class="form-label small fw-semibold">Vigente hasta (máx. 24 horas) *</label>
+                <input type="datetime-local" id="inputVigenteHasta" name="vigenteHasta"
+                       value="@vigenteDefault" min="@minFecha" max="@maxFecha"
+                       class="form-control" required />
+                <div class="form-text">El código QR caducará automáticamente al superar esta fecha y hora.</div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2">
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-sisph px-4">Generar pase QR</button>
+            </div>
+        </form>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        const btnCopiar = document.getElementById('btnCopiarToken');
+        const txtToken = document.getElementById('txtTokenPase');
+        const lblCopiado = document.getElementById('lblCopiado');
+        if (btnCopiar && txtToken) {
+            btnCopiar.addEventListener('click', () => {
+                const token = txtToken.textContent || '';
+                if (navigator.clipboard && token) {
+                    navigator.clipboard.writeText(token).then(() => {
+                        lblCopiado?.classList.remove('d-none');
+                    });
+                }
+            });
+        }
+    </script>
+}

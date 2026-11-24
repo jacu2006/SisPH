@@ -1,0 +1,114 @@
+@model IEnumerable<SisPH.Entidades.Entidades.PaseVisita>
+@{
+    ViewData["Title"] = "Pases de Visita QR";
+    var lista = Model.ToList();
+    var qrs = ViewBag.Qrs as Dictionary<int, string> ?? new();
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Pases de Visita QR</h1>
+        <p class="text-muted small mb-0">Genera autorizaciones temporales de hasta 24 horas para el ingreso de tus invitados por garita (CU-12)</p>
+    </div>
+    <a asp-action="Crear" class="btn btn-sisph">+ Generar pase QR</a>
+</div>
+
+<div class="sisph-card overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Visitante</th>
+                    <th>Cédula</th>
+                    <th>Vigente hasta</th>
+                    <th>Entrada / Salida</th>
+                    <th>Estado</th>
+                    <th class="text-end">Código QR</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (lista.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            No has generado pases de visita todavía.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var p in lista)
+                    {
+                        string estadoPase = p.Salida.HasValue
+                            ? "Usado"
+                            : p.Entrada.HasValue
+                                ? "En uso"
+                                : DateTime.Now > p.VigenteHasta
+                                    ? "Vencido"
+                                    : "Vigente";
+                        <tr>
+                            <td class="fw-semibold">@p.NombreVisitante</td>
+                            <td class="small text-muted">@(string.IsNullOrWhiteSpace(p.CedulaVisitante) ? "—" : p.CedulaVisitante)</td>
+                            <td class="small">@p.VigenteHasta.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td class="small">
+                                @if (p.Entrada.HasValue)
+                                {
+                                    <div><strong>Ent:</strong> @p.Entrada.Value.ToString("dd/MM HH:mm")</div>
+                                }
+                                @if (p.Salida.HasValue)
+                                {
+                                    <div><strong>Sal:</strong> @p.Salida.Value.ToString("dd/MM HH:mm")</div>
+                                }
+                                @if (!p.Entrada.HasValue && !p.Salida.HasValue)
+                                {
+                                    <span class="text-muted">Sin registrar</span>
+                                }
+                            </td>
+                            <td><partial name="_BadgeEstado" model="estadoPase" /></td>
+                            <td class="text-end">
+                                <div class="d-inline-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                            data-bs-toggle="modal" data-bs-target="#modalQrPase-@p.Id">
+                                        Ver QR
+                                    </button>
+                                    <a asp-action="DescargarQr" asp-route-id="@p.Id" class="btn btn-sm btn-outline-secondary">
+                                        Descargar
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@foreach (var p in lista)
+{
+    <div class="modal fade" id="modalQrPase-@p.Id" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content text-center">
+                <div class="modal-header">
+                    <h3 class="modal-title h6 fw-bold text-sisph">Pase · @p.NombreVisitante</h3>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="small text-muted mb-2">Vigente hasta @p.VigenteHasta.ToString("dd/MM/yyyy HH:mm")</div>
+                    @if (qrs.TryGetValue(p.Id, out var qrBase64))
+                    {
+                        <img src="@qrBase64"
+                             alt="QR Pase de @p.NombreVisitante"
+                             class="img-fluid border rounded p-2 bg-white mb-2"
+                             style="max-width: 210px;" />
+                    }
+                    <div class="small text-muted">Token de acceso (32 caracteres):</div>
+                    <div class="font-monospace small fw-semibold text-break bg-light border rounded p-2 mt-1">@p.TokenQR</div>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <a asp-action="DescargarQr" asp-route-id="@p.Id" class="btn btn-sm btn-sisph">Descargar imagen PNG</a>
+                </div>
+            </div>
+        </div>
+    </div>
+}

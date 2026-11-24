@@ -1,0 +1,285 @@
+@model SisPH.Web.Models.ReportesIndexViewModel
+@{
+    ViewData["Title"] = "Reportes y Analítica";
+    decimal totalMorosidad = Model.Morosidad.Sum(m => m.SaldoAdeudado);
+    decimal totalIngresos = Model.Ingresos.Sum(i => i.TotalRecaudado);
+    int totalPagos = Model.Ingresos.Sum(i => i.CantidadPagos);
+    decimal totalEstAreas = Model.UsoAreas.Sum(a => a.IngresosEstimados);
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Reportes Administrativos y Exportación Excel</h1>
+        <p class="text-muted small mb-0">Consulta de morosidad, recaudación mensual y uso de áreas sociales (CU-16 / RF-17)</p>
+    </div>
+    <a asp-action="Presupuesto" class="btn btn-sisph">Presupuesto y proyección quinquenal (CU-21)</a>
+</div>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item" role="presentation">
+        <a class="nav-link @(Model.TabActiva == "morosidad" ? "active fw-semibold" : "")"
+           asp-action="Index" asp-route-tab="morosidad">
+            1. Morosidad por torre (@Model.Morosidad.Count)
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link @(Model.TabActiva == "ingresos" ? "active fw-semibold" : "")"
+           asp-action="Index" asp-route-tab="ingresos">
+            2. Ingresos por mes (@Model.Ingresos.Count)
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link @(Model.TabActiva == "areas" ? "active fw-semibold" : "")"
+           asp-action="Index" asp-route-tab="areas">
+            3. Uso de áreas sociales (@Model.UsoAreas.Count)
+        </a>
+    </li>
+</ul>
+
+@if (Model.TabActiva == "morosidad")
+{
+    <div class="sisph-card p-3 mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+            <form method="get" class="row g-2 align-items-end flex-grow-1">
+                <input type="hidden" name="tab" value="morosidad" />
+                <div class="col-md-4">
+                    <label for="filtroTorreRep" class="form-label small fw-semibold mb-1">Torre</label>
+                    <select id="filtroTorreRep" name="torreId" class="form-select form-select-sm">
+                        <option value="">Todas las torres</option>
+                        @foreach (var t in Model.Torres)
+                        {
+                            <option value="@t.Id" selected="@(Model.TorreId == t.Id)">@t.Nombre</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check mb-1">
+                        <input type="checkbox" id="chkDosMeses" name="soloDosOMasMeses" value="true"
+                               class="form-check-input" checked="@Model.SoloDosOMasMeses" />
+                        <label for="chkDosMeses" class="form-check-label small fw-semibold">
+                            Solo 2 o más meses de atraso
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-sm btn-sisph">Aplicar filtros</button>
+                    <a asp-action="Index" asp-route-tab="morosidad" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+                </div>
+            </form>
+
+            <form asp-action="ExportarMorosidad" method="post">
+                <input type="hidden" name="torreId" value="@Model.TorreId" />
+                <input type="hidden" name="soloDosOMasMeses" value="@Model.SoloDosOMasMeses.ToString().ToLowerInvariant()" />
+                <button type="submit" class="btn btn-sm btn-outline-success">Exportar Excel (.xlsx)</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="sisph-card overflow-hidden">
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
+            <strong class="small text-sisph">Unidades en morosidad: @Model.Morosidad.Count</strong>
+            <strong class="small text-danger">Saldo adeudado total: $@totalMorosidad.ToString("N2")</strong>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Torre / Unidad</th>
+                        <th>Residente</th>
+                        <th>Contacto</th>
+                        <th class="text-center">Vencidas</th>
+                        <th class="text-center">Morosas (2+ m)</th>
+                        <th>Vencimiento más antiguo</th>
+                        <th class="text-end">Saldo adeudado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Morosidad.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">No se registran unidades con morosidad bajo estos criterios.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var m in Model.Morosidad)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="text-muted small">@m.Torre</span> ·
+                                    <strong>@m.NumeroUnidad</strong>
+                                    <span class="small text-muted">(Piso @m.Piso)</span>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold">@m.Residente</div>
+                                    <div class="small text-muted">@(m.Cedula ?? "—")</div>
+                                </td>
+                                <td class="small text-muted">
+                                    <div>@(m.Correo ?? "—")</div>
+                                    <div>@(m.Telefono ?? "")</div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge badge-soft-warning">@m.CuotasVencidas</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge badge-soft-danger">@m.CuotasMorosas</span>
+                                </td>
+                                <td class="small">@m.VencimientoMasAntiguo.ToString("dd/MM/yyyy")</td>
+                                <td class="text-end fw-bold text-danger">$@m.SaldoAdeudado.ToString("N2")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+else if (Model.TabActiva == "ingresos")
+{
+    <div class="sisph-card p-3 mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+            <form method="get" class="row g-2 align-items-end flex-grow-1">
+                <input type="hidden" name="tab" value="ingresos" />
+                <div class="col-md-4">
+                    <label for="desdeIng" class="form-label small fw-semibold mb-1">Desde</label>
+                    <input type="date" id="desdeIng" name="desdeIngresos"
+                           value="@Model.DesdeIngresos?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-4">
+                    <label for="hastaIng" class="form-label small fw-semibold mb-1">Hasta</label>
+                    <input type="date" id="hastaIng" name="hastaIngresos"
+                           value="@Model.HastaIngresos?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-sm btn-sisph">Filtrar</button>
+                    <a asp-action="Index" asp-route-tab="ingresos" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+                </div>
+            </form>
+
+            <form asp-action="ExportarIngresos" method="post">
+                <input type="hidden" name="desde" value="@Model.DesdeIngresos?.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="hasta" value="@Model.HastaIngresos?.ToString("yyyy-MM-dd")" />
+                <button type="submit" class="btn btn-sm btn-outline-success">Exportar Excel (.xlsx)</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="sisph-card overflow-hidden">
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
+            <strong class="small text-sisph">Total de pagos: @totalPagos</strong>
+            <strong class="small text-success">Total recaudado: $@totalIngresos.ToString("N2")</strong>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Período (AAAA-MM)</th>
+                        <th class="text-center">Cantidad de pagos</th>
+                        <th class="text-end">Total recaudado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Ingresos.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">No se encontraron ingresos en el rango indicado.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var ing in Model.Ingresos)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@ing.Periodo</td>
+                                <td class="text-center">@ing.CantidadPagos</td>
+                                <td class="text-end fw-bold text-success">$@ing.TotalRecaudado.ToString("N2")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+else
+{
+    <div class="sisph-card p-3 mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+            <form method="get" class="row g-2 align-items-end flex-grow-1">
+                <input type="hidden" name="tab" value="areas" />
+                <div class="col-md-3">
+                    <label for="filtroAreaRep" class="form-label small fw-semibold mb-1">Área social</label>
+                    <select id="filtroAreaRep" name="areaId" class="form-select form-select-sm">
+                        <option value="">Todas las áreas</option>
+                        @foreach (var a in Model.Areas)
+                        {
+                            <option value="@a.Id" selected="@(Model.AreaId == a.Id)">@a.Nombre</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="desdeAreas" class="form-label small fw-semibold mb-1">Desde</label>
+                    <input type="date" id="desdeAreas" name="desdeAreas"
+                           value="@Model.DesdeAreas?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-3">
+                    <label for="hastaAreas" class="form-label small fw-semibold mb-1">Hasta</label>
+                    <input type="date" id="hastaAreas" name="hastaAreas"
+                           value="@Model.HastaAreas?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-sm btn-sisph">Filtrar</button>
+                    <a asp-action="Index" asp-route-tab="areas" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+                </div>
+            </form>
+
+            <form asp-action="ExportarUsoAreas" method="post">
+                <input type="hidden" name="areaId" value="@Model.AreaId" />
+                <input type="hidden" name="desde" value="@Model.DesdeAreas?.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="hasta" value="@Model.HastaAreas?.ToString("yyyy-MM-dd")" />
+                <button type="submit" class="btn btn-sm btn-outline-success">Exportar Excel (.xlsx)</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="sisph-card overflow-hidden">
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
+            <strong class="small text-sisph">Áreas con actividad: @Model.UsoAreas.Count</strong>
+            <strong class="small text-success">Ingresos estimados: $@totalEstAreas.ToString("N2")</strong>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Área Social</th>
+                        <th class="text-center">Solicitudes totales</th>
+                        <th class="text-center">Aprobadas / Usadas</th>
+                        <th class="text-end">Ingresos estimados</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.UsoAreas.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">No hay reservas registradas en el período seleccionado.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var u in Model.UsoAreas)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@u.AreaSocial</td>
+                                <td class="text-center">@u.TotalReservas</td>
+                                <td class="text-center">
+                                    <span class="badge badge-soft-success">@u.AprobadasOUsadas</span>
+                                </td>
+                                <td class="text-end fw-bold text-sisph">$@u.IngresosEstimados.ToString("N2")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

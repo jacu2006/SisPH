@@ -1,0 +1,25 @@
+﻿@model IEnumerable<SisPH.Entidades.Entidades.ImagenArea>
+
+@if (Model != null && Model.Any())
+{
+    <div class="row g-2">
+        @foreach (var img in Model.OrderByDescending(i => i.EsPrincipal))
+        {
+            var rutaAlta = !string.IsNullOrWhiteSpace(img.Ruta) ? img.Ruta : img.RutaThumbnail;
+            <div class="col-6 col-md-4">
+                <div class="border rounded bg-light position-relative sisph-galeria-item">
+                    <img src="@rutaAlta"
+                         data-full-src="@rutaAlta"
+                         alt="Imagen del área social"
+                         role="button"
+                         tabindex="0"
+                         class="img-fluid w-100 sisph-galeria-img" />
+                    @if (img.EsPrincipal)
+                    {
+                        <span class="badge bg-primary position-absolute top-0 start-0 m-2 sisph-galeria-badge">Principal</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}

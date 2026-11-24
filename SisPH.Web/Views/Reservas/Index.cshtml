@@ -1,0 +1,167 @@
+@model IEnumerable<SisPH.Entidades.Entidades.Reserva>
+@using SisPH.Entidades.Enums
+@{
+    ViewData["Title"] = "Aprobar Reservas";
+    EstadoReserva? estadoSel = ViewBag.EstadoSeleccionado as EstadoReserva?;
+    var lista = Model.ToList();
+    var qrAprobada = TempData["QrReservaAprobada"] as string;
+    var reservaAprobadaId = TempData["ReservaAprobadaId"];
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h4 fw-bold text-sisph mb-1">Bandeja de Reservas de Áreas Sociales</h1>
+        <p class="text-muted small mb-0">Aprueba solicitudes con emisión de código QR o rechaza indicando el motivo (CU-09)</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(qrAprobada))
+{
+    <div class="sisph-card p-4 mb-4 border-success">
+        <div class="row align-items-center g-3">
+            <div class="col-md-9">
+                <h2 class="h6 fw-bold text-success mb-1">Código QR generado · Reserva #@reservaAprobadaId</h2>
+                <p class="small text-muted mb-0">
+                    La reserva ha sido aprobada y el pase QR está listo para validación en el área social.
+                </p>
+            </div>
+            <div class="col-md-3 text-center">
+                <img src="@qrAprobada"
+                     alt="QR Reserva #@reservaAprobadaId"
+                     class="img-fluid border rounded p-2 bg-white"
+                     style="max-width: 140px;" />
+            </div>
+        </div>
+    </div>
+}
+
+<div class="sisph-card p-3 mb-3">
+    <form method="get" id="formFiltroReservas" class="d-flex flex-wrap align-items-center gap-2">
+        <label for="selectEstadoReserva" class="small fw-semibold mb-0">Filtrar por estado:</label>
+        <select id="selectEstadoReserva" name="estado" class="form-select form-select-sm" style="max-width: 220px;">
+            <option value="">Todos los estados</option>
+            @foreach (EstadoReserva est in Enum.GetValues<EstadoReserva>())
+            {
+                <option value="@est" selected="@(estadoSel == est)">@est</option>
+            }
+        </select>
+        @if (estadoSel.HasValue)
+        {
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Ver todas</a>
+        }
+    </form>
+</div>
+
+<div class="sisph-card overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>Área Social</th>
+                    <th>Residente</th>
+                    <th>Fecha</th>
+                    <th>Horario</th>
+                    <th>Estado</th>
+                    <th>Detalle / Motivo</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (lista.Count == 0)
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">No hay reservas registradas con el filtro seleccionado.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var r in lista)
+                    {
+                        <tr>
+                            <td class="small text-muted">#@r.Id</td>
+                            <td class="fw-semibold">@r.AreaSocial?.Nombre</td>
+                            <td>@r.Residente?.NombreCompleto()</td>
+                            <td>@r.Fecha.ToString("dd/MM/yyyy")</td>
+                            <td class="small">@r.HoraInicio.ToString(@"hh\:mm") - @r.HoraFin.ToString(@"hh\:mm")</td>
+                            <td><partial name="_BadgeEstado" model="r.Estado.ToString()" /></td>
+                            <td class="small text-muted">
+                                @if (!string.IsNullOrWhiteSpace(r.MotivoRechazo))
+                                {
+                                    <span class="text-danger">@r.MotivoRechazo</span>
+                                }
+                                else if (r.UsuarioAprobador is not null)
+                                {
+                                    <span>Aprobó: @r.UsuarioAprobador.Nombre</span>
+                                }
+                                else
+                                {
+                                    <span>Solicitada el @r.FechaSolicitud.ToString("dd/MM/yyyy HH:mm")</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                @if (r.Estado == EstadoReserva.Solicitada)
+                                {
+                                    <div class="d-inline-flex gap-1">
+                                        <form asp-action="Aprobar" method="post" class="d-inline">
+                                            <input type="hidden" name="id" value="@r.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-success">Aprobar</button>
+                                        </form>
+                                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                                data-bs-toggle="modal" data-bs-target="#modalRechazar-@r.Id">
+                                            Rechazar
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="small text-muted">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@foreach (var r in lista.Where(x => x.Estado == EstadoReserva.Solicitada))
+{
+    <div class="modal fade" id="modalRechazar-@r.Id" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form asp-action="Rechazar" method="post">
+                    <div class="modal-header">
+                        <h3 class="modal-title h6 fw-bold text-sisph">Rechazar Reserva #@r.Id</h3>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="id" value="@r.Id" />
+                        <p class="small text-muted">
+                            Área: <strong>@r.AreaSocial?.Nombre</strong> · Fecha: <strong>@r.Fecha.ToString("dd/MM/yyyy")</strong>
+                        </p>
+                        <label for="motivo-@r.Id" class="form-label small fw-semibold">Motivo del rechazo *</label>
+                        <textarea id="motivo-@r.Id" name="motivo" class="form-control" rows="3" required maxlength="300"
+                                  placeholder="Indica la razón del rechazo para el residente..."></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-sm btn-danger">Confirmar rechazo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        document.getElementById('selectEstadoReserva')?.addEventListener('change', () => {
+            const form = document.getElementById('formFiltroReservas');
+            if (form instanceof HTMLFormElement) {
+                form.submit();
+            }
+        });
+    </script>
+}

@@ -1,0 +1,76 @@
+@model SisPH.Negocio.Interfaces.ReciboVerificadoDto?
+@{
+    ViewData["Title"] = "Verificación de Recibo";
+}
+
+<div class="container py-5">
+    <div class="mx-auto" style="max-width: 640px;">
+        <div class="sisph-card p-4">
+            <div class="text-center mb-4">
+                <h1 class="h4 fw-bold text-sisph mb-1">Verificación de Autenticidad de Recibo</h1>
+                <p class="small text-muted mb-0">Validación criptográfica HMAC-SHA256 · SisPH</p>
+            </div>
+
+            @if (Model is null)
+            {
+                <div class="alert alert-danger text-center mb-0">
+                    <div class="fw-bold mb-1">Recibo no encontrado</div>
+                    <div class="small">El identificador consultado no corresponde a ningún comprobante emitido por SisPH.</div>
+                </div>
+            }
+            else
+            {
+                var pago = Model.Pago;
+                if (Model.FirmaValida)
+                {
+                    <div class="alert alert-success text-center mb-4">
+                        <div class="fs-5 fw-bold">Recibo Auténtico · Firma Válida</div>
+                        <div class="small">La firma digital HMAC-SHA256 coincide exactamente con los datos registrados.</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-danger text-center mb-4">
+                        <div class="fs-5 fw-bold">¡Alerta! Firma Digital Alterada</div>
+                        <div class="small">Los datos de este comprobante no coinciden con su firma criptográfica original.</div>
+                    </div>
+                }
+
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted">Número de recibo</dt>
+                    <dd class="col-sm-8 fw-bold">#@pago.Id.ToString("D6")</dd>
+
+                    <dt class="col-sm-4 text-muted">Unidad</dt>
+                    <dd class="col-sm-8">@pago.Unidad?.Torre?.Nombre · Unidad @pago.Unidad?.Numero</dd>
+
+                    <dt class="col-sm-4 text-muted">Monto pagado</dt>
+                    <dd class="col-sm-8 fw-bold text-success fs-5">$@pago.Monto.ToString("N2")</dd>
+
+                    <dt class="col-sm-4 text-muted">Fecha y hora</dt>
+                    <dd class="col-sm-8">@pago.Fecha.ToString("dd/MM/yyyy HH:mm")</dd>
+
+                    <dt class="col-sm-4 text-muted">Método de pago</dt>
+                    <dd class="col-sm-8">@pago.Metodo</dd>
+
+                    @if (!string.IsNullOrWhiteSpace(pago.Referencia))
+                    {
+                        <dt class="col-sm-4 text-muted">Referencia</dt>
+                        <dd class="col-sm-8">@pago.Referencia</dd>
+                    }
+
+                    <dt class="col-sm-4 text-muted">Estado de firma</dt>
+                    <dd class="col-sm-8">
+                        @if (Model.FirmaValida)
+                        {
+                            <span class="badge rounded-pill badge-soft-success px-3 py-1">Firma Válida</span>
+                        }
+                        else
+                        {
+                            <partial name="_BadgeEstado" model="@("Alterada")" />
+                        }
+                    </dd>
+                </dl>
+            }
+        </div>
+    </div>
+</div>

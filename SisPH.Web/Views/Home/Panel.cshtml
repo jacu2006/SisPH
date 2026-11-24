@@ -1,0 +1,202 @@
+﻿@model SisPH.Web.Models.PanelViewModel
+@using SisPH.Entidades.Enums
+@{
+    ViewData["Title"] = "Panel principal";
+    var rol = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+}
+
+<div class="mb-4">
+    <h1 class="h4 fw-bold text-sisph mb-1">Bienvenido, @User.Identity?.Name</h1>
+    <p class="text-muted small mb-0">Has iniciado sesión con el perfil de <strong>@rol</strong>.</p>
+</div>
+
+@if (User.IsInRole("Administrador"))
+{
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="sisph-card p-3 h-100">
+                <div class="small text-muted">Unidades activas</div>
+                <div class="fs-3 fw-bold text-sisph">@Model.UnidadesActivas</div>
+                <a asp-controller="Unidades" asp-action="Index" class="small text-decoration-none">Gestionar unidades →</a>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="sisph-card p-3 h-100">
+                <div class="small text-muted">Morosidad actual (@Model.UnidadesMorosas unid.)</div>
+                <div class="fs-3 fw-bold @(Model.TotalMorosidad > 0 ? "text-danger" : "text-success")">
+                    $@Model.TotalMorosidad.ToString("N2")
+                </div>
+                <a asp-controller="Reportes" asp-action="Index" class="small text-decoration-none">Ver reporte morosidad →</a>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="sisph-card p-3 h-100">
+                <div class="small text-muted">Reservas por aprobar</div>
+                <div class="fs-3 fw-bold @(Model.ReservasPendientes > 0 ? "text-warning" : "text-sisph")">@Model.ReservasPendientes</div>
+                <a asp-controller="Reservas" asp-action="Index" class="small text-decoration-none">Ir a bandeja →</a>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="sisph-card p-3 h-100">
+                <div class="small text-muted">Incidencias activas</div>
+                <div class="fs-3 fw-bold text-sisph">@Model.IncidenciasAbiertas</div>
+                <a asp-controller="Incidencias" asp-action="Index" class="small text-decoration-none">Atender incidencias →</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="sisph-card p-4 h-100">
+                <h2 class="h6 fw-bold text-sisph">Estructura y Residentes</h2>
+                <p class="small text-muted">Administra torres, coeficientes de participación, propietarios e inquilinos.</p>
+                <a asp-controller="Unidades" asp-action="Index" class="btn btn-sm btn-sisph">Ir a unidades</a>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="sisph-card p-4 h-100">
+                <h2 class="h6 fw-bold text-sisph">Cuotas y Presupuesto</h2>
+                <p class="small text-muted">Genera cuotas mensuales ordinarias, extraordinarias y consulta reportes.</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <a asp-controller="Cuotas" asp-action="Index" class="btn btn-sm btn-sisph">Gestionar cuotas</a>
+                    <a asp-controller="Reportes" asp-action="Presupuesto" class="btn btn-sm btn-outline-primary">Presupuesto</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="sisph-card p-4 h-100">
+                <h2 class="h6 fw-bold text-sisph">Auditoría Criptográfica</h2>
+                <p class="small text-muted">Verifica la integridad HMAC-SHA256 de la bitácora y revisa los logs de error.</p>
+                <a asp-controller="Auditoria" asp-action="Index" class="btn btn-sm btn-sisph">Abrir auditoría</a>
+            </div>
+        </div>
+    </div>
+}
+
+@if (User.IsInRole("Operador"))
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="sisph-card p-3 h-100">
+                <div class="small text-muted">Accesos registrados hoy</div>
+                <div class="fs-3 fw-bold text-sisph">@Model.AccesosHoy</div>
+                <a asp-controller="Garita" asp-action="Index" class="small text-decoration-none">Abrir escáner QR →</a>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="sisph-card p-3 h-100">
+                <div class="small text-muted">Visitantes actualmente en sitio</div>
+                <div class="fs-3 fw-bold text-success">@Model.VisitantesEnSitio</div>
+                <a asp-controller="Garita" asp-action="Index" class="small text-decoration-none">Ver historial de garita →</a>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="sisph-card p-3 h-100">
+                <div class="small text-muted">Incidencias abiertas / en proceso</div>
+                <div class="fs-3 fw-bold @(Model.IncidenciasAbiertas > 0 ? "text-warning" : "text-sisph")">@Model.IncidenciasAbiertas</div>
+                <a asp-controller="Incidencias" asp-action="Index" class="small text-decoration-none">Gestionar incidencias →</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="sisph-card p-4 h-100">
+                <h2 class="h6 fw-bold text-sisph">Control de Garita QR</h2>
+                <p class="small text-muted">Valida pases de visita y registra entradas o salidas en tiempo real.</p>
+                <a asp-controller="Garita" asp-action="Index" class="btn btn-sm btn-sisph">Abrir garita</a>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="sisph-card p-4 h-100">
+                <h2 class="h6 fw-bold text-sisph">Caja y Recibos Firmados</h2>
+                <p class="small text-muted">Registra pagos de cuotas y emite comprobantes digitales con QR.</p>
+                <a asp-controller="Pagos" asp-action="Index" class="btn btn-sm btn-sisph">Registrar pago</a>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="sisph-card p-4 h-100">
+                <h2 class="h6 fw-bold text-sisph">Mudanzas e Incidencias</h2>
+                <p class="small text-muted">Valida paz y salvo para mudanzas y atiende reportes de mantenimiento.</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <a asp-controller="Mudanzas" asp-action="Index" class="btn btn-sm btn-sisph">Mudanzas</a>
+                    <a asp-controller="Incidencias" asp-action="Index" class="btn btn-sm btn-outline-primary">Incidencias</a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (User.IsInRole("Residente"))
+{
+    var portal = Model.PortalResidente;
+    if (portal is not null)
+    {
+        int pasesVigentes = portal.Pases.Count(p => !p.Salida.HasValue && DateTime.Now <= p.VigenteHasta);
+        int incidenciasActivas = portal.Incidencias.Count(i => i.Estado != EstadoIncidencia.Cerrada);
+        int reservasActivas = portal.Reservas.Count(r =>
+            (r.Estado == EstadoReserva.Solicitada || r.Estado == EstadoReserva.Aprobada) && r.Fecha.Date >= DateTime.Today);
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="sisph-card p-3 h-100 @(portal.EstaPazYSalvo ? "border-success" : "border-danger")">
+                    <div class="small text-muted mb-1">Estado de cuenta</div>
+                    <div class="mb-1">
+                        @if (portal.EstaPazYSalvo)
+                        {
+                            <partial name="_BadgeEstado" model="@("A paz y salvo")" />
+                        }
+                        else
+                        {
+                            <partial name="_BadgeEstado" model="@("Morosa")" />
+                        }
+                    </div>
+                    <div class="small text-muted">
+                        Saldo pendiente: <strong>$@portal.TotalAdeudado.ToString("N2")</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="sisph-card p-3 h-100">
+                    <div class="small text-muted">Pases de visita vigentes</div>
+                    <div class="fs-3 fw-bold text-sisph">@pasesVigentes</div>
+                    <a asp-controller="Pases" asp-action="Index" class="small text-decoration-none">Administrar pases QR →</a>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="sisph-card p-3 h-100">
+                    <div class="small text-muted">Reservas activas / Incidencias abiertas</div>
+                    <div class="fs-3 fw-bold text-sisph">@reservasActivas / @incidenciasActivas</div>
+                    <a asp-controller="Reservas" asp-action="MisReservas" class="small text-decoration-none">Ver reservas →</a>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="sisph-card p-4 h-100">
+                <h2 class="h6 fw-bold text-sisph">Mi Estado de Cuenta</h2>
+                <p class="small text-muted">Consulta tus cuotas pendientes, pagos realizados y descarga tus recibos.</p>
+                <a asp-controller="Portal" asp-action="Index" class="btn btn-sm btn-sisph">Ver mi cuenta</a>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="sisph-card p-4 h-100">
+                <h2 class="h6 fw-bold text-sisph">Pases de Visita QR</h2>
+                <p class="small text-muted">Genera códigos QR temporales de hasta 24 horas para tus invitados.</p>
+                <a asp-controller="Pases" asp-action="Index" class="btn btn-sm btn-sisph">Crear pase</a>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="sisph-card p-4 h-100">
+                <h2 class="h6 fw-bold text-sisph">Reservas e Incidencias</h2>
+                <p class="small text-muted">Solicita áreas sociales o reporta novedades de mantenimiento.</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <a asp-controller="Reservas" asp-action="Solicitar" class="btn btn-sm btn-sisph">Reservar área</a>
+                    <a asp-controller="Incidencias" asp-action="Reportar" class="btn btn-sm btn-outline-primary">Reportar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
