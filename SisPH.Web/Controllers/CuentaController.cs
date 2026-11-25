@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SisPH.Negocio.Interfaces;
+using SisPH.Web.Extensions;
 using SisPH.Web.Models;
 
 namespace SisPH.Web.Controllers;
@@ -49,11 +50,15 @@ public class CuentaController : Controller
             new(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
             new(ClaimTypes.Name, usuario.Nombre),
             new(ClaimTypes.Email, usuario.Correo),
-            new(ClaimTypes.Role, rolNombre)
+            new(ClaimTypes.Role, rolNombre),
+            new("RolId", usuario.RolId.ToString())
         };
 
         if (usuario.Residente is not null)
             claims.Add(new Claim("ResidenteId", usuario.Residente.Id.ToString()));
+
+        if (usuario.DebeCambiarPassword)
+            claims.Add(new Claim("DebeCambiarPassword", "true"));
 
         var identidad = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identidad);
@@ -62,6 +67,12 @@ public class CuentaController : Controller
             CookieAuthenticationDefaults.AuthenticationScheme,
             principal,
             new AuthenticationProperties { IsPersistent = false });
+
+        if (usuario.DebeCambiarPassword)
+        {
+            TempData["MensajeError"] = "Tu cuenta utiliza una contraseña temporal. Debes actualizarla antes de operar en el sistema.";
+            return RedirectToAction(nameof(CambiarPassword));
+        }
 
         return RedirectToAction("Panel", "Home");
     }
@@ -85,13 +96,27 @@ public class CuentaController : Controller
         if (!ModelState.IsValid)
             return View(model);
 
-        int usuarioId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        int usuarioId = User.ObtenerUsuarioId();
         var res = await _auth.CambiarPasswordAsync(usuarioId, model.ClaveActual, model.ClaveNueva);
 
         if (!res.Exito)
         {
             TempData["MensajeError"] = res.Mensaje;
             return View(model);
+        }
+
+        // [#14] Refrescar la cookie retirando el claim de cambio obligatorio
+        if (User.HasClaim("DebeCambiarPassword", "true"))
+        {
+            var nuevosClaims = User.Claims
+                .Where(c => c.Type != "DebeCambiarPassword")
+                .ToList();
+
+            var identidad = new ClaimsIdentity(nuevosClaims, CookieAuthenticationDefaults.AuthenticationScheme);
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(identidad),
+                new AuthenticationProperties { IsPersistent = false });
         }
 
         TempData["MensajeExito"] = res.Mensaje;

@@ -40,6 +40,7 @@ public class ServicioPases : IServicioPases
             .Where(p => p.VigenteHasta >= dia || (p.Entrada.HasValue && p.Entrada.Value.Date == dia))
             .OrderByDescending(p => p.Entrada ?? p.VigenteHasta)
             .AsNoTracking()
+            .AsSplitQuery()
             .ToListAsync();
     }
 

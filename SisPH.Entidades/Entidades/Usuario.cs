@@ -1,4 +1,5 @@
-﻿using SisPH.Entidades.Interfaces;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using SisPH.Entidades.Interfaces;
 
 namespace SisPH.Entidades.Entidades;
 
@@ -13,6 +14,9 @@ public class Usuario : IDesactivable
     public int IntentosFallidos { get; set; } = 0;
     public DateTime? BloqueadoHasta { get; set; }
     public DateTime FechaCreacion { get; set; } = DateTime.Now;
+
+    [NotMapped]
+    public bool DebeCambiarPassword { get; set; }
 
     public Rol? Rol { get; set; }
     public Residente? Residente { get; set; }

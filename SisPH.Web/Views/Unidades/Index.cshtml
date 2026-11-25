@@ -4,6 +4,9 @@
     ViewData["Title"] = "Torres y Unidades";
     var torres = ViewBag.Torres as List<Torre> ?? new();
     int? torreSel = ViewBag.TorreSeleccionada;
+    decimal sumaGlobalPH = torres.SelectMany(t => t.Unidades).Where(u => u.Activo).Sum(u => u.Coeficiente);
+    decimal disponiblePH = Math.Max(0m, 100m - sumaGlobalPH);
+    int totalActivasPH = torres.SelectMany(t => t.Unidades).Count(u => u.Activo);
 }
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
@@ -17,7 +20,12 @@
 <div class="row g-3 mb-4">
     <div class="col-lg-7">
         <div class="sisph-card p-3 h-100">
-            <h2 class="h6 fw-bold text-sisph mb-3">Resumen por Torre (Coeficiente acumulado)</h2>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h2 class="h6 fw-bold text-sisph mb-0">Resumen por Torre y Total Global del PH</h2>
+                <span class="badge rounded-pill @(sumaGlobalPH > 100m ? "badge-soft-danger" : "badge-soft-info") px-3 py-1">
+                    Global PH: @sumaGlobalPH.ToString("0.####") % / 100 % (@totalActivasPH activas · Disp: @disponiblePH.ToString("0.####") %)
+                </span>
+            </div>
             <div class="row g-2">
                 @foreach (var t in torres)
                 {

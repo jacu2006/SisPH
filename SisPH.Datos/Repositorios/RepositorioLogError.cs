@@ -30,6 +30,8 @@ public class RepositorioLogError : IRepositorioLogError
             Ip = ip != null && ip.Length > 45 ? ip[..45] : ip
         };
 
+        _contexto.ChangeTracker.Clear();
+
         await _contexto.LogErrores.AddAsync(log);
         await _contexto.SaveChangesAsync();
         return log.Id;

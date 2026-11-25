@@ -57,6 +57,13 @@ public class ResidentesController : Controller
             ArchivoSubido? archivo = null;
             if (foto is not null && foto.Length > 0)
             {
+                if (foto.Length > 2L * 1024 * 1024)
+                {
+                    TempData["MensajeError"] = "La fotografía del residente no puede superar los 2 MB.";
+                    ViewBag.Unidades = await _unidades.ListarUnidadesAsync(null, true);
+                    return View();
+                }
+
                 stream = foto.OpenReadStream();
                 archivo = new ArchivoSubido(stream, foto.FileName, foto.Length);
             }
@@ -109,6 +116,13 @@ public class ResidentesController : Controller
             ArchivoSubido? archivo = null;
             if (nuevaFoto is not null && nuevaFoto.Length > 0)
             {
+                if (nuevaFoto.Length > 2L * 1024 * 1024)
+                {
+                    TempData["MensajeError"] = "La fotografía del residente no puede superar los 2 MB.";
+                    var residente = await _residentes.ObtenerPorIdAsync(id);
+                    return View(residente);
+                }
+
                 stream = nuevaFoto.OpenReadStream();
                 archivo = new ArchivoSubido(stream, nuevaFoto.FileName, nuevaFoto.Length);
             }

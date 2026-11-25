@@ -7,4 +7,5 @@ public interface IServicioAutenticacion
 {
     Task<ResultadoOperacion<Usuario>> LoginAsync(string correo, string clave);
     Task<ResultadoOperacion> CambiarPasswordAsync(int usuarioId, string claveActual, string claveNueva);
+    Task<bool> RequiereCambioPasswordAsync(int usuarioId);
 }

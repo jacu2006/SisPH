@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Globalization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using SisPH.Datos.Contexto;
 using SisPH.Datos.Interfaces;
 using SisPH.Entidades.Entidades;
@@ -10,21 +12,35 @@ namespace SisPH.Negocio.Servicios;
 
 public class ServicioCuotas : IServicioCuotas
 {
+    private const decimal RecargoPorDefecto = 10.0m;
+
     private readonly IRepositorio<Cuota> _repoCuota;
     private readonly IRepositorio<Unidad> _repoUnidad;
     private readonly SisPHDbContext _contexto;
     private readonly IServicioBitacora _bitacora;
+    private readonly IConfiguration _configuracion;
 
     public ServicioCuotas(
         IRepositorio<Cuota> repoCuota,
         IRepositorio<Unidad> repoUnidad,
         SisPHDbContext contexto,
-        IServicioBitacora bitacora)
+        IServicioBitacora bitacora,
+        IConfiguration configuracion)
     {
         _repoCuota = repoCuota;
         _repoUnidad = repoUnidad;
         _contexto = contexto;
         _bitacora = bitacora;
+        _configuracion = configuracion;
+    }
+
+    public decimal ObtenerPorcentajeRecargoMora()
+    {
+        var valor = _configuracion["Finanzas:PorcentajeRecargoMora"];
+        if (decimal.TryParse(valor, NumberStyles.Number, CultureInfo.InvariantCulture, out var pct) && pct >= 0m && pct <= 100m)
+            return pct;
+
+        return RecargoPorDefecto;
     }
 
     public async Task<List<Cuota>> ListarPorPeriodoAsync(string? periodo = null, int? torreId = null, EstadoCuota? estado = null)
@@ -33,7 +49,8 @@ public class ServicioCuotas : IServicioCuotas
             .Include(c => c.Unidad)
                 .ThenInclude(u => u!.Torre)
             .Include(c => c.PagoDetalles)
-            .AsNoTracking();
+            .AsNoTracking()
+            .AsSplitQuery();
 
         if (!string.IsNullOrWhiteSpace(periodo))
             query = query.Where(c => c.Periodo == periodo.Trim());
@@ -54,15 +71,30 @@ public class ServicioCuotas : IServicioCuotas
     public async Task<List<Cuota>> ListarPendientesPorUnidadAsync(int unidadId) =>
         await _repoCuota.Consultar()
             .Include(c => c.PagoDetalles)
+            .AsNoTracking()
             .Where(c => c.UnidadId == unidadId && c.Estado != EstadoCuota.Pagada)
             .OrderBy(c => c.Vence)
             .ThenBy(c => c.Id)
             .ToListAsync();
 
-    public async Task<bool> UnidadEstaPazYSalvoAsync(int unidadId) =>
-        !await _repoCuota.ExisteAsync(c =>
-            c.UnidadId == unidadId &&
-            (c.Estado == EstadoCuota.Vencida || c.Estado == EstadoCuota.Morosa));
+    // [#6] Paz y Salvo dinámico: consulta cuotas con saldo pendiente y vencimiento anterior a hoy
+    public async Task<bool> UnidadEstaPazYSalvoAsync(int unidadId)
+    {
+        var hoy = DateTime.Today;
+        var cuotasNoPagadas = await _repoCuota.Consultar()
+            .Include(c => c.PagoDetalles)
+            .AsNoTracking()
+            .Where(c => c.UnidadId == unidadId && c.Estado != EstadoCuota.Pagada)
+            .ToListAsync();
+
+        bool tieneAtraso = cuotasNoPagadas.Any(c =>
+        {
+            decimal saldo = (c.Monto + c.Recargo) - c.PagoDetalles.Sum(pd => pd.MontoAplicado);
+            return saldo > 0m && (c.Vence.Date < hoy || c.Estado == EstadoCuota.Vencida || c.Estado == EstadoCuota.Morosa);
+        });
+
+        return !tieneAtraso;
+    }
 
     public async Task<ResultadoOperacion<List<VistaPreviaCuotaItem>>> GenerarVistaPreviaAsync(
         string periodo, decimal presupuesto, TipoCuota tipo)
@@ -78,6 +110,7 @@ public class ServicioCuotas : IServicioCuotas
 
         var unidades = await _repoUnidad.Consultar()
             .Include(u => u.Torre)
+            .AsNoTracking()
             .Where(u => u.Activo)
             .OrderBy(u => u.Torre!.Nombre)
             .ThenBy(u => u.Numero)
@@ -85,6 +118,12 @@ public class ServicioCuotas : IServicioCuotas
 
         if (unidades.Count == 0)
             return ResultadoOperacion<List<VistaPreviaCuotaItem>>.Error("No hay unidades activas registradas.");
+
+        // [#1] Verificar que el acumulado global de coeficientes de todo el PH no supere el 100 %
+        decimal sumaCoefGlobal = unidades.Sum(u => u.Coeficiente);
+        if (sumaCoefGlobal > 100m)
+            return ResultadoOperacion<List<VistaPreviaCuotaItem>>.Error(
+                $"La suma global de coeficientes activos del PH ({sumaCoefGlobal:0.####} %) supera el 100 %. Ajuste los coeficientes en Torres y Unidades antes de generar cuotas.");
 
         var lista = unidades.Select(u => new VistaPreviaCuotaItem(
             u.Id,
@@ -116,9 +155,10 @@ public class ServicioCuotas : IServicioCuotas
         return ResultadoOperacion.Ok($"Se generaron {previa.Datos!.Count} cuotas para el período {periodo}.");
     }
 
-    public async Task<ResultadoOperacion> ActualizarEstadosYRecargosAsync(decimal porcentajeRecargo = 10m, int? usuarioId = null)
+    public async Task<ResultadoOperacion> ActualizarEstadosYRecargosAsync(decimal? porcentajeRecargo = null, int? usuarioId = null)
     {
-        await _contexto.EjecutarActualizarEstadosCuotaAsync(porcentajeRecargo, DateTime.Today);
+        decimal recargoAplicado = porcentajeRecargo ?? ObtenerPorcentajeRecargoMora();
+        await _contexto.EjecutarActualizarEstadosCuotaAsync(recargoAplicado, DateTime.Today);
 
         if (usuarioId.HasValue)
         {
@@ -127,9 +167,9 @@ public class ServicioCuotas : IServicioCuotas
                 "ActualizarEstadosCuota",
                 "Cuota",
                 null,
-                $"Ejecución de actualización de estados y recargos ({porcentajeRecargo:0.##} %).");
+                $"Ejecución de actualización de estados y recargos ({recargoAplicado:0.##} %).");
         }
 
-        return ResultadoOperacion.Ok("Estados y recargos de cuotas actualizados.");
+        return ResultadoOperacion.Ok($"Estados y recargos de cuotas actualizados ({recargoAplicado:0.##} %).");
     }
 }

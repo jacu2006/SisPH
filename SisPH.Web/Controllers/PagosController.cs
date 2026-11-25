@@ -118,12 +118,23 @@ public class PagosController : Controller
         return View(recibo);
     }
 
+    // [#18] Exigir parámetro de firma f y validarlo en tiempo constante sin exponer datos por enumeración de id
     [AllowAnonymous]
     [HttpGet]
-    public async Task<IActionResult> Verificar(int id)
+    public async Task<IActionResult> Verificar(int id, string? f)
     {
+        if (string.IsNullOrWhiteSpace(f))
+        {
+            Response.StatusCode = StatusCodes.Status404NotFound;
+            return View((ReciboVerificadoDto?)null);
+        }
+
         var urlBase = Url.Action(nameof(Verificar), "Pagos", null, Request.Scheme) ?? string.Empty;
-        var recibo = await _pagos.ObtenerReciboVerificadoAsync(id, urlBase);
+        var recibo = await _pagos.VerificarReciboPublicoAsync(id, f, urlBase);
+
+        if (recibo is null)
+            Response.StatusCode = StatusCodes.Status404NotFound;
+
         return View(recibo);
     }
 }

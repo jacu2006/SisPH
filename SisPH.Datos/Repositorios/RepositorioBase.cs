@@ -45,7 +45,17 @@ public class RepositorioBase<T> : IRepositorio<T> where T : class
 
     public async Task ModificarAsync(T entidad)
     {
-        _dbSet.Update(entidad);
+        var entry = _contexto.Entry(entidad);
+        if (entry.State == EntityState.Detached)
+        {
+            _dbSet.Attach(entidad);
+            entry.State = EntityState.Modified;
+        }
+        else if (entry.State == EntityState.Unchanged)
+        {
+            entry.State = EntityState.Modified;
+        }
+
         await _contexto.SaveChangesAsync();
     }
 }

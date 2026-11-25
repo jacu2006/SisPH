@@ -1,0 +1,51 @@
+@model SisPH.Negocio.Interfaces.ReservaVerificadaDto?
+@{
+    ViewData["Title"] = "Verificación de Reserva";
+}
+
+<div class="container py-5">
+    <div class="mx-auto" style="max-width: 640px;">
+        <div class="sisph-card p-4">
+            <div class="text-center mb-4">
+                <h1 class="h4 fw-bold text-sisph mb-1">Verificación de Reserva de Área Social</h1>
+                <p class="small text-muted mb-0">Validación criptográfica HMAC-SHA256 · SisPH</p>
+            </div>
+
+            @if (Model is null || !Model.FirmaValida)
+            {
+                <div class="alert alert-danger text-center mb-0">
+                    <div class="fw-bold mb-1">Reserva no encontrada o firma inválida</div>
+                    <div class="small">El código QR escaneado no corresponde a una reserva auténtica emitida por SisPH.</div>
+                </div>
+            }
+            else
+            {
+                var reserva = Model.Reserva;
+                <div class="alert alert-success text-center mb-4">
+                    <div class="fs-5 fw-bold">Reserva Auténtica · Firma Válida</div>
+                    <div class="small">La firma digital HMAC-SHA256 ha sido verificada correctamente.</div>
+                </div>
+
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted">Reserva #</dt>
+                    <dd class="col-sm-8 fw-bold">#@reserva.Id.ToString("D6")</dd>
+
+                    <dt class="col-sm-4 text-muted">Área social</dt>
+                    <dd class="col-sm-8 fw-semibold">@reserva.AreaSocial?.Nombre</dd>
+
+                    <dt class="col-sm-4 text-muted">Residente</dt>
+                    <dd class="col-sm-8">@reserva.Residente?.NombreCompleto()</dd>
+
+                    <dt class="col-sm-4 text-muted">Fecha</dt>
+                    <dd class="col-sm-8">@reserva.Fecha.ToString("dd/MM/yyyy")</dd>
+
+                    <dt class="col-sm-4 text-muted">Horario</dt>
+                    <dd class="col-sm-8">@reserva.HoraInicio.ToString(@"hh\:mm") - @reserva.HoraFin.ToString(@"hh\:mm")</dd>
+
+                    <dt class="col-sm-4 text-muted">Estado actual</dt>
+                    <dd class="col-sm-8"><partial name="_BadgeEstado" model="reserva.Estado.ToString()" /></dd>
+                </dl>
+            }
+        </div>
+    </div>
+</div>

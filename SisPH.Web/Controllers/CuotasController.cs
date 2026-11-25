@@ -26,6 +26,7 @@ public class CuotasController : Controller
         ViewBag.PeriodoActual = periodo;
         ViewBag.TorreSeleccionada = torreId;
         ViewBag.EstadoSeleccionado = estado;
+        ViewBag.PorcentajeRecargo = _cuotas.ObtenerPorcentajeRecargoMora();
 
         var lista = await _cuotas.ListarPorPeriodoAsync(periodo, torreId, estado);
         return View(lista);
@@ -34,7 +35,8 @@ public class CuotasController : Controller
     [HttpPost]
     public async Task<IActionResult> ActualizarEstados()
     {
-        var res = await _cuotas.ActualizarEstadosYRecargosAsync(10m, User.ObtenerUsuarioId());
+        // [#33] Usa el porcentaje de recargo configurado en appsettings.json (Finanzas:PorcentajeRecargoMora)
+        var res = await _cuotas.ActualizarEstadosYRecargosAsync(null, User.ObtenerUsuarioId());
         TempData[res.Exito ? "MensajeExito" : "MensajeError"] = res.Mensaje;
         return RedirectToAction(nameof(Index));
     }

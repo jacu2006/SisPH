@@ -51,7 +51,8 @@ public class ServicioUnidades : IServicioUnidades
             .Include(u => u.Torre)
             .Include(u => u.Ocupaciones.Where(o => o.FechaFin == null))
                 .ThenInclude(o => o.Residente)
-            .AsNoTracking();
+            .AsNoTracking()
+            .AsSplitQuery();
 
         if (torreId.HasValue)
             query = query.Where(u => u.TorreId == torreId.Value);
@@ -82,6 +83,17 @@ public class ServicioUnidades : IServicioUnidades
         return await query.SumAsync(u => (decimal?)u.Coeficiente) ?? 0m;
     }
 
+    public async Task<decimal> ObtenerSumaCoeficientesGlobalAsync(int? excluirUnidadId = null)
+    {
+        var query = _repoUnidad.Consultar()
+            .Where(u => u.Activo);
+
+        if (excluirUnidadId.HasValue)
+            query = query.Where(u => u.Id != excluirUnidadId.Value);
+
+        return await query.SumAsync(u => (decimal?)u.Coeficiente) ?? 0m;
+    }
+
     public async Task<ResultadoOperacion> CrearUnidadAsync(
         int torreId, string numero, int piso, decimal metros2, decimal coeficiente, int adminId)
     {
@@ -99,10 +111,11 @@ public class ServicioUnidades : IServicioUnidades
         if (await _repoUnidad.ExisteAsync(u => u.TorreId == torreId && u.Numero.ToUpper() == numeroNorm))
             return ResultadoOperacion.Error($"Ya existe la unidad {numeroNorm} en {torre.Nombre}.");
 
-        var sumaActual = await ObtenerSumaCoeficientesTorreAsync(torreId);
-        if (sumaActual + coeficiente > 100m)
+        // [#1] Validar que la suma global de coeficientes activos de TODO el PH no supere el 100 %
+        var sumaGlobal = await ObtenerSumaCoeficientesGlobalAsync();
+        if (sumaGlobal + coeficiente > 100m)
             return ResultadoOperacion.Error(
-                $"La suma de coeficientes de {torre.Nombre} superaría el 100 % (actual: {sumaActual:0.####} %, disponible: {100m - sumaActual:0.####} %).");
+                $"La suma global de coeficientes activos del PH superaría el 100 % (actual global: {sumaGlobal:0.####} %, disponible: {Math.Max(0m, 100m - sumaGlobal):0.####} %).");
 
         var unidad = new Unidad
         {
@@ -121,7 +134,7 @@ public class ServicioUnidades : IServicioUnidades
             "Crear",
             "Unidad",
             unidad.Id.ToString(),
-            $"Unidad {numeroNorm} creada en {torre.Nombre} (Coef: {coeficiente} %).");
+            $"Unidad {numeroNorm} creada en {torre.Nombre} (Coef: {coeficiente:0.####} %).");
 
         return ResultadoOperacion.Ok("Unidad registrada correctamente.");
     }
@@ -141,15 +154,19 @@ public class ServicioUnidades : IServicioUnidades
         if (piso < 1 || piso > torre.Pisos)
             return ResultadoOperacion.Error($"El piso debe estar entre 1 y {torre.Pisos}.");
 
+        if (metros2 <= 0 || coeficiente <= 0)
+            return ResultadoOperacion.Error("Los metros cuadrados y el coeficiente deben ser mayores a cero.");
+
         if (await _repoUnidad.ExisteAsync(u => u.Id != id && u.TorreId == torreId && u.Numero.ToUpper() == numeroNorm))
             return ResultadoOperacion.Error($"Ya existe otra unidad con el número {numeroNorm} en {torre.Nombre}.");
 
         if (unidad.Activo)
         {
-            var sumaActual = await ObtenerSumaCoeficientesTorreAsync(torreId, id);
-            if (sumaActual + coeficiente > 100m)
+            // [#1] Validar coeficiente acumulado global del PH
+            var sumaGlobal = await ObtenerSumaCoeficientesGlobalAsync(id);
+            if (sumaGlobal + coeficiente > 100m)
                 return ResultadoOperacion.Error(
-                    $"La suma de coeficientes superaría el 100 % (disponible: {100m - sumaActual:0.####} %).");
+                    $"La suma global de coeficientes activos del PH superaría el 100 % (disponible: {Math.Max(0m, 100m - sumaGlobal):0.####} %).");
         }
 
         unidad.TorreId = torreId;
@@ -178,9 +195,10 @@ public class ServicioUnidades : IServicioUnidades
 
         if (activo)
         {
-            var sumaActual = await ObtenerSumaCoeficientesTorreAsync(unidad.TorreId, id);
-            if (sumaActual + unidad.Coeficiente > 100m)
-                return ResultadoOperacion.Error("No se puede reactivar porque la suma de coeficientes de la torre superaría el 100 %.");
+            var sumaGlobal = await ObtenerSumaCoeficientesGlobalAsync(id);
+            if (sumaGlobal + unidad.Coeficiente > 100m)
+                return ResultadoOperacion.Error(
+                    $"No se puede reactivar porque la suma global de coeficientes del PH superaría el 100 % (actual: {sumaGlobal:0.####} %).");
             unidad.Activo = true;
         }
         else

@@ -12,4 +12,6 @@ public interface IServicioArchivos
         string rutaFisicaWwwroot,
         bool generarThumbnail = false,
         int anchoThumbnailPx = 200);
+
+    void EliminarArchivo(string? rutaRelativa, string rutaFisicaWwwroot);
 }

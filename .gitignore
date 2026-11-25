@@ -486,4 +486,6 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-!script/SisPH.bak
+# Respaldos de base de datos (alojados externamente) y secretos locales
+*.bak
+appsettings.Development.json

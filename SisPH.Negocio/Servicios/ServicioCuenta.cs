@@ -87,10 +87,18 @@ public class ServicioCuenta : IServicioCuenta
             .AsNoTracking()
             .ToListAsync();
 
-        bool pazYSalvo = !cuotas.Any(c => c.Estado == EstadoCuota.Vencida || c.Estado == EstadoCuota.Morosa);
+        // [#6] Paz y Salvo dinámico considerando fecha de vencimiento real
+        var hoy = DateTime.Today;
+        bool pazYSalvo = !cuotas.Any(c =>
+        {
+            if (c.Estado == EstadoCuota.Pagada) return false;
+            decimal saldo = (c.Monto + c.Recargo) - c.PagoDetalles.Sum(pd => pd.MontoAplicado);
+            return saldo > 0m && (c.Vence.Date < hoy || c.Estado == EstadoCuota.Vencida || c.Estado == EstadoCuota.Morosa);
+        });
+
         decimal totalAdeudado = cuotas
             .Where(c => c.Estado != EstadoCuota.Pagada)
-            .Sum(c => (c.Monto + c.Recargo) - c.PagoDetalles.Sum(pd => pd.MontoAplicado));
+            .Sum(c => Math.Max(0m, (c.Monto + c.Recargo) - c.PagoDetalles.Sum(pd => pd.MontoAplicado)));
 
         return new EstadoCuentaResidenteDto(
             residente,

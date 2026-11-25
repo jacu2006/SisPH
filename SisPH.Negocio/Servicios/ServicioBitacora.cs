@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Globalization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SisPH.Datos.Interfaces;
 using SisPH.Entidades.Entidades;
@@ -25,13 +26,12 @@ public class ServicioBitacora : IServicioBitacora
 
     public async Task RegistrarAsync(int? usuarioId, string accion, string entidad, string? entidadId = null, string? detalle = null)
     {
-        var ahora = DateTime.Now;
-        var fechaNormalizada = new DateTime((ahora.Ticks / TimeSpan.TicksPerMillisecond) * TimeSpan.TicksPerMillisecond);
+        var fechaPrecisa = DateTime.Now;
 
         var registro = new Bitacora
         {
             UsuarioId = usuarioId,
-            Fecha = fechaNormalizada,
+            Fecha = fechaPrecisa,
             Accion = accion,
             Entidad = entidad,
             EntidadId = entidadId,
@@ -45,7 +45,17 @@ public class ServicioBitacora : IServicioBitacora
     public bool VerificarFila(Bitacora registro)
     {
         var payload = ConstruirPayload(registro);
-        return _firma.Verificar(payload, registro.Firma);
+        if (_firma.Verificar(payload, registro.Firma))
+            return true;
+
+        // Compatibilidad con registros firmados con el formato anterior de milisegundos
+        if (registro.Fecha.Ticks % TimeSpan.TicksPerMillisecond == 0)
+        {
+            var payloadAnterior = ConstruirPayloadAnterior(registro);
+            return _firma.Verificar(payloadAnterior, registro.Firma);
+        }
+
+        return false;
     }
 
     public async Task<List<RegistroBitacoraAuditoria>> ConsultarBitacoraAsync(
@@ -99,5 +109,12 @@ public class ServicioBitacora : IServicioBitacora
     }
 
     private static string ConstruirPayload(Bitacora b) =>
-        $"{b.UsuarioId?.ToString() ?? "NULL"}|{b.Fecha:yyyy-MM-ddTHH:mm:ss.fff}|{b.Accion}|{b.Entidad}|{b.EntidadId ?? ""}|{b.Detalle ?? ""}";
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"{b.UsuarioId?.ToString(CultureInfo.InvariantCulture) ?? "NULL"}|{b.Fecha:yyyy-MM-dd HH:mm:ss.fffffff}|{b.Accion}|{b.Entidad}|{b.EntidadId ?? ""}|{b.Detalle ?? ""}");
+
+    private static string ConstruirPayloadAnterior(Bitacora b) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"{b.UsuarioId?.ToString(CultureInfo.InvariantCulture) ?? "NULL"}|{b.Fecha:yyyy-MM-ddTHH:mm:ss.fff}|{b.Accion}|{b.Entidad}|{b.EntidadId ?? ""}|{b.Detalle ?? ""}");
 }

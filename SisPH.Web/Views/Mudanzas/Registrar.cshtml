@@ -38,9 +38,9 @@
             </div>
         </div>
 
-        <div id="bloqueEntrada" class="row g-3 mb-3 p-3 bg-light border rounded">
+        <div id="bloqueResidente" class="row g-3 mb-3 p-3 bg-light border rounded">
             <div class="col-md-7">
-                <label for="selectResidenteEntrada" class="form-label small fw-semibold">Residente que ingresa *</label>
+                <label for="selectResidenteEntrada" id="lblResidenteMudanza" class="form-label small fw-semibold">Residente que ingresa *</label>
                 <select id="selectResidenteEntrada" name="residenteIdEntrada" class="form-select">
                     <option value="">-- Seleccione el residente --</option>
                     @foreach (var r in Model.Residentes)
@@ -50,8 +50,11 @@
                         </option>
                     }
                 </select>
+                <div id="ayudaSalida" class="form-text d-none">
+                    Opcional en salida: si se omite, se cierra la ocupación del inquilino vigente manteniendo al propietario.
+                </div>
             </div>
-            <div class="col-md-5">
+            <div class="col-md-5" id="bloqueTipoOcupacion">
                 <label for="selectTipoOcupacion" class="form-label small fw-semibold">Tipo de ocupación</label>
                 <select id="selectTipoOcupacion" name="tipoOcupacionEntrada" class="form-select">
                     @foreach (TipoOcupacion occ in Enum.GetValues<TipoOcupacion>())
@@ -78,15 +81,23 @@
 @section Scripts {
     <script>
         const selectTipo = document.getElementById('selectTipoMudanza');
-        const bloqueEntrada = document.getElementById('bloqueEntrada');
+        const bloqueTipoOcupacion = document.getElementById('bloqueTipoOcupacion');
+        const lblResidente = document.getElementById('lblResidenteMudanza');
+        const ayudaSalida = document.getElementById('ayudaSalida');
         const selectResidente = document.getElementById('selectResidenteEntrada');
 
         function actualizarCamposEntrada() {
-            if (!(selectTipo instanceof HTMLSelectElement) || !bloqueEntrada) {
+            if (!(selectTipo instanceof HTMLSelectElement)) {
                 return;
             }
             const esEntrada = selectTipo.value === 'Entrada';
-            bloqueEntrada.classList.toggle('d-none', !esEntrada);
+            bloqueTipoOcupacion?.classList.toggle('d-none', !esEntrada);
+            ayudaSalida?.classList.toggle('d-none', esEntrada);
+            if (lblResidente) {
+                lblResidente.textContent = esEntrada
+                    ? 'Residente que ingresa *'
+                    : 'Residente que sale (opcional)';
+            }
             if (selectResidente instanceof HTMLSelectElement) {
                 selectResidente.required = esEntrada;
             }

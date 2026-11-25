@@ -9,6 +9,8 @@ namespace SisPH.Negocio.Servicios;
 
 public class ServicioIncidencias : IServicioIncidencias
 {
+    private const int MaxLongitudObservacion = 1000;
+
     private readonly IRepositorio<Incidencia> _repoIncidencia;
     private readonly IServicioArchivos _archivos;
     private readonly IServicioBitacora _bitacora;
@@ -84,7 +86,15 @@ public class ServicioIncidencias : IServicioIncidencias
             Fecha = DateTime.Now
         };
 
-        await _repoIncidencia.AgregarAsync(incidencia);
+        try
+        {
+            await _repoIncidencia.AgregarAsync(incidencia);
+        }
+        catch
+        {
+            _archivos.EliminarArchivo(rutaFoto, rutaFisicaWwwroot);
+            throw;
+        }
 
         await _bitacora.RegistrarAsync(
             usuarioId,
@@ -123,14 +133,19 @@ public class ServicioIncidencias : IServicioIncidencias
         if (string.IsNullOrWhiteSpace(observacionTecnica))
             return ResultadoOperacion.Error("La observación técnica es obligatoria para marcar la incidencia como Resuelta.");
 
+        var obsLimpia = observacionTecnica.Trim();
+        if (obsLimpia.Length > MaxLongitudObservacion)
+            return ResultadoOperacion.Error($"La observación técnica no puede exceder los {MaxLongitudObservacion} caracteres.");
+
         var incidencia = await _repoIncidencia.ObtenerPorIdAsync(incidenciaId);
         if (incidencia is null)
             return ResultadoOperacion.Error("La incidencia no existe.");
 
-        if (incidencia.Estado != EstadoIncidencia.EnProceso && incidencia.Estado != EstadoIncidencia.Abierta)
-            return ResultadoOperacion.Error("La incidencia no puede resolverse desde su estado actual.");
+        // [#16] Flujo estricto: debe pasar obligatoriamente por EnProceso antes de Resuelta
+        if (incidencia.Estado != EstadoIncidencia.EnProceso)
+            return ResultadoOperacion.Error("La incidencia debe pasar primero a estado En proceso (Tomar) antes de poder marcarse como Resuelta.");
 
-        incidencia.ObservacionTecnica = observacionTecnica.Trim();
+        incidencia.ObservacionTecnica = obsLimpia;
         incidencia.CambiarEstado(EstadoIncidencia.Resuelta);
         await _repoIncidencia.ModificarAsync(incidencia);
 
@@ -168,6 +183,11 @@ public class ServicioIncidencias : IServicioIncidencias
 
     public async Task<ResultadoOperacion> ReabrirAsync(int incidenciaId, string motivoReapertura, int usuarioId)
     {
+        // [#17] Validar que el motivo de reapertura no exceda 1000 caracteres
+        var nota = string.IsNullOrWhiteSpace(motivoReapertura) ? "Residente no conforme." : motivoReapertura.Trim();
+        if (nota.Length > MaxLongitudObservacion)
+            return ResultadoOperacion.Error($"El motivo de reapertura no puede exceder los {MaxLongitudObservacion} caracteres.");
+
         var incidencia = await _repoIncidencia.ObtenerPorIdAsync(incidenciaId);
         if (incidencia is null)
             return ResultadoOperacion.Error("La incidencia no existe.");
@@ -175,8 +195,14 @@ public class ServicioIncidencias : IServicioIncidencias
         if (incidencia.Estado != EstadoIncidencia.Resuelta)
             return ResultadoOperacion.Error("Solo se pueden reabrir incidencias en estado Resuelta.");
 
-        var nota = string.IsNullOrWhiteSpace(motivoReapertura) ? "Residente no conforme." : motivoReapertura.Trim();
-        incidencia.ObservacionTecnica = $"{incidencia.ObservacionTecnica} | [Reabierta]: {nota}".Trim();
+        var combinada = string.IsNullOrWhiteSpace(incidencia.ObservacionTecnica)
+            ? $"[Reabierta]: {nota}"
+            : $"{incidencia.ObservacionTecnica} | [Reabierta]: {nota}";
+
+        if (combinada.Length > MaxLongitudObservacion)
+            combinada = combinada[..MaxLongitudObservacion];
+
+        incidencia.ObservacionTecnica = combinada;
         incidencia.CambiarEstado(EstadoIncidencia.EnProceso);
         await _repoIncidencia.ModificarAsync(incidencia);
 

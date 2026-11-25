@@ -18,5 +18,6 @@ public interface IServicioCuotas
     Task<bool> UnidadEstaPazYSalvoAsync(int unidadId);
     Task<ResultadoOperacion<List<VistaPreviaCuotaItem>>> GenerarVistaPreviaAsync(string periodo, decimal presupuesto, TipoCuota tipo);
     Task<ResultadoOperacion> GenerarCuotasAsync(string periodo, decimal presupuesto, TipoCuota tipo, DateTime? vence, int adminId);
-    Task<ResultadoOperacion> ActualizarEstadosYRecargosAsync(decimal porcentajeRecargo = 10m, int? usuarioId = null);
+    decimal ObtenerPorcentajeRecargoMora();
+    Task<ResultadoOperacion> ActualizarEstadosYRecargosAsync(decimal? porcentajeRecargo = null, int? usuarioId = null);
 }

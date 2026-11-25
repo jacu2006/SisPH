@@ -22,4 +22,5 @@ public interface IServicioPagos
         int operadorId);
 
     Task<ReciboVerificadoDto?> ObtenerReciboVerificadoAsync(int pagoId, string urlBaseVerificacion);
+    Task<ReciboVerificadoDto?> VerificarReciboPublicoAsync(int pagoId, string? firmaRecibida, string urlBaseVerificacion);
 }

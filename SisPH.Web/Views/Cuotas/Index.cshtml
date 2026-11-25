@@ -7,6 +7,7 @@
     string? periodoActual = ViewBag.PeriodoActual as string;
     int? torreSel = ViewBag.TorreSeleccionada as int?;
     EstadoCuota? estadoSel = ViewBag.EstadoSeleccionado as EstadoCuota?;
+    decimal pctRecargo = ViewBag.PorcentajeRecargo is decimal r ? r : 10m;
     var lista = Model.ToList();
     decimal totalFacturado = lista.Sum(c => c.Monto + c.Recargo);
     decimal totalSaldo = lista.Sum(c => Math.Max(0m, (c.Monto + c.Recargo) - c.PagoDetalles.Sum(pd => pd.MontoAplicado)));
@@ -20,7 +21,7 @@
     <div class="d-flex flex-wrap gap-2">
         <form asp-action="ActualizarEstados" method="post" class="d-inline">
             <button type="submit" class="btn btn-outline-warning btn-sm px-3 py-2">
-                Actualizar estados y recargos (10%)
+                Actualizar estados y recargos (@pctRecargo.ToString("0.##")%)
             </button>
         </form>
         <a asp-action="Generar" class="btn btn-sisph">+ Generar cuotas</a>

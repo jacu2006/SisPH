@@ -1,5 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Security.Cryptography;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using SisPH.Datos.Contexto;
 using SisPH.Datos.Interfaces;
 using SisPH.Entidades.Entidades;
 using SisPH.Entidades.Enums;
@@ -11,10 +13,13 @@ namespace SisPH.Negocio.Servicios;
 
 public class ServicioResidentes : IServicioResidentes
 {
+    private const long MaxFotoBytes = 2L * 1024 * 1024;
+
     private readonly IRepositorio<Residente> _repoResidente;
     private readonly IRepositorio<Ocupacion> _repoOcupacion;
     private readonly IRepositorio<Unidad> _repoUnidad;
     private readonly IRepositorio<Usuario> _repoUsuario;
+    private readonly SisPHDbContext _contexto;
     private readonly IServicioArchivos _archivos;
     private readonly ITransformacionSegura _hash;
     private readonly IServicioBitacora _bitacora;
@@ -24,6 +29,7 @@ public class ServicioResidentes : IServicioResidentes
         IRepositorio<Ocupacion> repoOcupacion,
         IRepositorio<Unidad> repoUnidad,
         IRepositorio<Usuario> repoUsuario,
+        SisPHDbContext contexto,
         IServicioArchivos archivos,
         [FromKeyedServices("hash")] ITransformacionSegura hash,
         IServicioBitacora bitacora)
@@ -32,6 +38,7 @@ public class ServicioResidentes : IServicioResidentes
         _repoOcupacion = repoOcupacion;
         _repoUnidad = repoUnidad;
         _repoUsuario = repoUsuario;
+        _contexto = contexto;
         _archivos = archivos;
         _hash = hash;
         _bitacora = bitacora;
@@ -44,7 +51,8 @@ public class ServicioResidentes : IServicioResidentes
             .Include(r => r.Ocupaciones.Where(o => o.FechaFin == null))
                 .ThenInclude(o => o.Unidad)
                     .ThenInclude(u => u!.Torre)
-            .AsNoTracking();
+            .AsNoTracking()
+            .AsSplitQuery();
 
         if (soloActivos.HasValue)
             query = query.Where(r => r.Activo == soloActivos.Value);
@@ -76,6 +84,9 @@ public class ServicioResidentes : IServicioResidentes
         string rutaFisicaWwwroot,
         int adminId)
     {
+        if (foto is not null && foto.TamanioBytes > MaxFotoBytes)
+            return ResultadoOperacion<string?>.Error("La foto del residente supera el tamaño máximo permitido de 2 MB.");
+
         var cedulaNorm = cedula.Trim();
         var correoNorm = correo.Trim().ToLowerInvariant();
 
@@ -112,61 +123,85 @@ public class ServicioResidentes : IServicioResidentes
             }
         }
 
-        int? usuarioId = null;
-        string? claveTemporal = null;
-
-        if (crearUsuarioPortal)
+        // [#8 y #28] Envolver Usuario, Residente y Ocupación en transacción y limpiar foto si falla
+        await using var transaccion = await _contexto.Database.BeginTransactionAsync();
+        try
         {
-            claveTemporal = $"Res#{Guid.NewGuid().ToString("N")[..6]}";
-            var usuarioPortal = new Usuario
+            int? usuarioId = null;
+            string? claveTemporal = null;
+
+            if (crearUsuarioPortal)
             {
-                RolId = (int)SisPH.Entidades.Enums.Rol.Residente,
-                Nombre = $"{nombre.Trim()} {apellido.Trim()}",
+                claveTemporal = GenerarClaveTemporalSegura();
+                var usuarioPortal = new Usuario
+                {
+                    RolId = (int)SisPH.Entidades.Enums.Rol.Residente,
+                    Nombre = $"{nombre.Trim()} {apellido.Trim()}",
+                    Correo = correoNorm,
+                    PasswordHash = _hash.Transformar(claveTemporal),
+                    Activo = true,
+                    FechaCreacion = DateTime.Now,
+                    DebeCambiarPassword = true
+                };
+                await _repoUsuario.AgregarAsync(usuarioPortal);
+                usuarioId = usuarioPortal.Id;
+            }
+
+            var residente = new Residente
+            {
+                UsuarioId = usuarioId,
+                Cedula = cedulaNorm,
+                Nombre = nombre.Trim(),
+                Apellido = apellido.Trim(),
+                Foto = rutaFoto,
+                Telefono = telefono?.Trim(),
                 Correo = correoNorm,
-                PasswordHash = _hash.Transformar(claveTemporal),
-                Activo = true,
-                FechaCreacion = DateTime.Now
+                Activo = true
             };
-            await _repoUsuario.AgregarAsync(usuarioPortal);
-            usuarioId = usuarioPortal.Id;
+
+            await _repoResidente.AgregarAsync(residente);
+
+            var ocupacion = new Ocupacion
+            {
+                UnidadId = unidadId,
+                ResidenteId = residente.Id,
+                Tipo = tipoOcupacion,
+                FechaInicio = DateTime.Today
+            };
+
+            await _repoOcupacion.AgregarAsync(ocupacion);
+
+            await transaccion.CommitAsync();
+
+            await _bitacora.RegistrarAsync(
+                adminId,
+                "Crear",
+                "Residente",
+                residente.Id.ToString(),
+                $"Residente {residente.NombreCompleto()} ({cedulaNorm}) asignado a UnidadId {unidadId} como {tipoOcupacion}.");
+
+            if (usuarioId.HasValue)
+            {
+                await _bitacora.RegistrarAsync(
+                    adminId,
+                    "ClaveTemporalAsignada",
+                    "Usuario",
+                    usuarioId.Value.ToString(),
+                    "Contraseña temporal asignada al residente; requiere cambio obligatorio al iniciar sesión.");
+            }
+
+            var msg = claveTemporal is null
+                ? "Residente registrado y asignado correctamente."
+                : $"Residente registrado con acceso al portal. Clave temporal (cambio obligatorio al iniciar sesión): {claveTemporal}";
+
+            return ResultadoOperacion<string?>.Ok(claveTemporal, msg);
         }
-
-        var residente = new Residente
+        catch
         {
-            UsuarioId = usuarioId,
-            Cedula = cedulaNorm,
-            Nombre = nombre.Trim(),
-            Apellido = apellido.Trim(),
-            Foto = rutaFoto,
-            Telefono = telefono?.Trim(),
-            Correo = correoNorm,
-            Activo = true
-        };
-
-        await _repoResidente.AgregarAsync(residente);
-
-        var ocupacion = new Ocupacion
-        {
-            UnidadId = unidadId,
-            ResidenteId = residente.Id,
-            Tipo = tipoOcupacion,
-            FechaInicio = DateTime.Today
-        };
-
-        await _repoOcupacion.AgregarAsync(ocupacion);
-
-        await _bitacora.RegistrarAsync(
-            adminId,
-            "Crear",
-            "Residente",
-            residente.Id.ToString(),
-            $"Residente {residente.NombreCompleto()} ({cedulaNorm}) asignado a UnidadId {unidadId} como {tipoOcupacion}.");
-
-        var msg = claveTemporal is null
-            ? "Residente registrado y asignado correctamente."
-            : $"Residente registrado con acceso al portal. Clave temporal: {claveTemporal}";
-
-        return ResultadoOperacion<string?>.Ok(claveTemporal, msg);
+            await transaccion.RollbackAsync();
+            _archivos.EliminarArchivo(rutaFoto, rutaFisicaWwwroot);
+            throw;
+        }
     }
 
     public async Task<ResultadoOperacion> ModificarAsync(
@@ -180,6 +215,9 @@ public class ServicioResidentes : IServicioResidentes
         string rutaFisicaWwwroot,
         int adminId)
     {
+        if (nuevaFoto is not null && nuevaFoto.TamanioBytes > MaxFotoBytes)
+            return ResultadoOperacion.Error("La foto del residente supera el tamaño máximo permitido de 2 MB.");
+
         var residente = await _repoResidente.ObtenerPorIdAsync(id);
         if (residente is null)
             return ResultadoOperacion.Error("El residente no existe.");
@@ -193,6 +231,7 @@ public class ServicioResidentes : IServicioResidentes
         if (await _repoResidente.ExisteAsync(r => r.Id != id && r.Correo.ToLower() == correoNorm))
             return ResultadoOperacion.Error("El correo ya pertenece a otro residente.");
 
+        string? rutaNuevaGuardada = null;
         if (nuevaFoto is not null && nuevaFoto.TamanioBytes > 0)
         {
             try
@@ -204,7 +243,8 @@ public class ServicioResidentes : IServicioResidentes
                     "residentes",
                     rutaFisicaWwwroot,
                     generarThumbnail: false);
-                residente.Foto = guardado.RutaRelativa;
+                rutaNuevaGuardada = guardado.RutaRelativa;
+                residente.Foto = rutaNuevaGuardada;
             }
             catch (InvalidOperationException ex)
             {
@@ -218,7 +258,15 @@ public class ServicioResidentes : IServicioResidentes
         residente.Telefono = telefono?.Trim();
         residente.Correo = correoNorm;
 
-        await _repoResidente.ModificarAsync(residente);
+        try
+        {
+            await _repoResidente.ModificarAsync(residente);
+        }
+        catch
+        {
+            _archivos.EliminarArchivo(rutaNuevaGuardada, rutaFisicaWwwroot);
+            throw;
+        }
 
         await _bitacora.RegistrarAsync(
             adminId,
@@ -259,5 +307,16 @@ public class ServicioResidentes : IServicioResidentes
             $"Baja lógica de residente {residente.NombreCompleto()}.");
 
         return ResultadoOperacion.Ok("Residente dado de baja correctamente.");
+    }
+
+    private static string GenerarClaveTemporalSegura()
+    {
+        const string caracteres = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        Span<char> sufijo = stackalloc char[8];
+        for (int i = 0; i < sufijo.Length; i++)
+        {
+            sufijo[i] = caracteres[RandomNumberGenerator.GetInt32(caracteres.Length)];
+        }
+        return $"Res#{new string(sufijo)}";
     }
 }

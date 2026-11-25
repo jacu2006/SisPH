@@ -1,9 +1,12 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Globalization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SisPH.Datos.Interfaces;
 using SisPH.Entidades.Entidades;
 using SisPH.Entidades.Enums;
 using SisPH.Negocio.Interfaces;
 using SisPH.Negocio.Modelos;
+using SisPH.Seguridad;
 
 namespace SisPH.Negocio.Servicios;
 
@@ -13,6 +16,7 @@ public class ServicioReservas : IServicioReservas
     private readonly IRepositorio<AreaSocial> _repoArea;
     private readonly IRepositorio<Ocupacion> _repoOcupacion;
     private readonly IServicioCuotas _servicioCuotas;
+    private readonly ITransformacionSegura _firma;
     private readonly IServicioQR _qr;
     private readonly IServicioBitacora _bitacora;
 
@@ -21,6 +25,7 @@ public class ServicioReservas : IServicioReservas
         IRepositorio<AreaSocial> repoArea,
         IRepositorio<Ocupacion> repoOcupacion,
         IServicioCuotas servicioCuotas,
+        [FromKeyedServices("firma")] ITransformacionSegura firma,
         IServicioQR qr,
         IServicioBitacora bitacora)
     {
@@ -28,6 +33,7 @@ public class ServicioReservas : IServicioReservas
         _repoArea = repoArea;
         _repoOcupacion = repoOcupacion;
         _servicioCuotas = servicioCuotas;
+        _firma = firma;
         _qr = qr;
         _bitacora = bitacora;
     }
@@ -38,7 +44,8 @@ public class ServicioReservas : IServicioReservas
             .Include(r => r.AreaSocial)
             .Include(r => r.Residente)
             .Include(r => r.UsuarioAprobador)
-            .AsNoTracking();
+            .AsNoTracking()
+            .AsSplitQuery();
 
         if (estado.HasValue)
             query = query.Where(r => r.Estado == estado.Value);
@@ -61,15 +68,18 @@ public class ServicioReservas : IServicioReservas
 
     public async Task<List<(TimeSpan Inicio, TimeSpan Fin)>> ObtenerFranjasOcupadasAsync(int areaId, DateTime fecha)
     {
-        var aprobadas = await _repoReserva.BuscarAsync(r =>
-            r.AreaId == areaId &&
-            r.Fecha.Date == fecha.Date &&
-            r.Estado == EstadoReserva.Aprobada);
-
-        return aprobadas
+        var dia = fecha.Date;
+        var franjas = await _repoReserva.Consultar()
+            .AsNoTracking()
+            .Where(r =>
+                r.AreaId == areaId &&
+                r.Fecha.Date == dia &&
+                r.Estado == EstadoReserva.Aprobada)
             .OrderBy(r => r.HoraInicio)
-            .Select(r => (r.HoraInicio, r.HoraFin))
-            .ToList();
+            .Select(r => new { r.HoraInicio, r.HoraFin })
+            .ToListAsync();
+
+        return franjas.Select(r => (r.HoraInicio, r.HoraFin)).ToList();
     }
 
     public async Task<ResultadoOperacion> SolicitarAsync(
@@ -77,6 +87,10 @@ public class ServicioReservas : IServicioReservas
     {
         if (fecha.Date < DateTime.Today)
             return ResultadoOperacion.Error("No puedes solicitar reservas para fechas pasadas.");
+
+        // [#20] Rechazar solicitudes para hoy cuya hora de inicio ya pasó
+        if (fecha.Date == DateTime.Today && horaInicio <= DateTime.Now.TimeOfDay)
+            return ResultadoOperacion.Error("No puedes solicitar una reserva para hoy en un horario que ya inició o pasó.");
 
         if (horaFin <= horaInicio)
             return ResultadoOperacion.Error("La hora de fin debe ser posterior a la hora de inicio.");
@@ -89,7 +103,7 @@ public class ServicioReservas : IServicioReservas
             return ResultadoOperacion.Error(
                 $"El horario solicitado está fuera del horario permitido del área ({area.HoraApertura:hh\\:mm} a {area.HoraCierre:hh\\:mm}).");
 
-        // CU-19: Verificar paz y salvo de la unidad vigente del residente
+        // [#6 y #19] Verificar paz y salvo dinámico de la unidad vigente del residente
         var ocupacion = await _repoOcupacion.Consultar()
             .FirstOrDefaultAsync(o => o.ResidenteId == residenteId && o.FechaFin == null);
 
@@ -139,6 +153,17 @@ public class ServicioReservas : IServicioReservas
         if (reserva.Estado != EstadoReserva.Solicitada)
             return ResultadoOperacion<string>.Error("Solo se pueden aprobar reservas en estado Solicitada.");
 
+        // [#19] Revalidar Paz y Salvo dinámico al momento de aprobar la reserva
+        var ocupacion = await _repoOcupacion.Consultar()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(o => o.ResidenteId == reserva.ResidenteId && o.FechaFin == null);
+
+        if (ocupacion is null)
+            return ResultadoOperacion<string>.Error("No se puede aprobar: el residente ya no cuenta con una unidad activa.");
+
+        if (!await _servicioCuotas.UnidadEstaPazYSalvoAsync(ocupacion.UnidadId))
+            return ResultadoOperacion<string>.Error("No se puede aprobar la reserva: la unidad del residente tiene cuotas vencidas o morosas.");
+
         var aprobadasMismoDia = await _repoReserva.BuscarAsync(r =>
             r.Id != reservaId &&
             r.AreaId == reserva.AreaId &&
@@ -154,7 +179,8 @@ public class ServicioReservas : IServicioReservas
 
         await _repoReserva.ModificarAsync(reserva);
 
-        var qrBase64 = _qr.GenerarPngBase64($"{urlBaseVerificacion.TrimEnd('/')}/{reserva.Id}");
+        // [#11] QR firmado apuntando a Reservas/Verificar/{id}?f={firmaHmac}
+        var qrBase64 = GenerarQrReserva(reserva, urlBaseVerificacion);
 
         await _bitacora.RegistrarAsync(
             adminId,
@@ -215,4 +241,38 @@ public class ServicioReservas : IServicioReservas
 
         return ResultadoOperacion.Ok("Reserva cancelada correctamente.");
     }
+
+    public string GenerarQrReserva(Reserva reserva, string urlBaseVerificacion)
+    {
+        var firma = _firma.Transformar(ConstruirPayloadReserva(reserva));
+        var url = $"{urlBaseVerificacion.TrimEnd('/')}/{reserva.Id}?f={Uri.EscapeDataString(firma)}";
+        return _qr.GenerarPngBase64(url);
+    }
+
+    public async Task<ReservaVerificadaDto?> ObtenerReservaVerificadaAsync(int reservaId, string? firmaRecibida)
+    {
+        if (string.IsNullOrWhiteSpace(firmaRecibida))
+            return null;
+
+        var reserva = await _repoReserva.Consultar()
+            .Include(r => r.AreaSocial)
+            .Include(r => r.Residente)
+            .Include(r => r.UsuarioAprobador)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == reservaId);
+
+        if (reserva is null)
+            return null;
+
+        bool firmaValida = _firma.Verificar(ConstruirPayloadReserva(reserva), firmaRecibida.Trim());
+        if (!firmaValida)
+            return null;
+
+        return new ReservaVerificadaDto(reserva, true);
+    }
+
+    private static string ConstruirPayloadReserva(Reserva r) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"RESERVA|{r.Id}|{r.AreaId}|{r.ResidenteId}|{r.Fecha:yyyy-MM-dd}|{r.HoraInicio:hh\\:mm}|{r.HoraFin:hh\\:mm}");
 }

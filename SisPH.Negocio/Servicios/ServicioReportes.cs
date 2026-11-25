@@ -11,6 +11,10 @@ namespace SisPH.Negocio.Servicios;
 
 public class ServicioReportes : IServicioReportes
 {
+    private const decimal TasaMinimaPct = -50.0m;
+    private const decimal TasaMaximaPct = 100.0m;
+    private const int MaxLongitudConcepto = 100;
+
     private readonly SisPHDbContext _contexto;
     private readonly IRepositorio<Pago> _repoPago;
     private readonly IRepositorio<Reserva> _repoReserva;
@@ -167,16 +171,25 @@ public class ServicioReportes : IServicioReportes
     public async Task<ResultadoOperacion> GuardarLineaPresupuestoAsync(
         int anio, string concepto, string tipo, decimal montoProyectado, int adminId)
     {
-        if (anio < 2000 || string.IsNullOrWhiteSpace(concepto) || montoProyectado < 0)
-            return ResultadoOperacion.Error("Verifique el año, concepto y monto proyectado.");
+        if (anio < 2000 || anio > 2100 || string.IsNullOrWhiteSpace(concepto) || montoProyectado < 0)
+            return ResultadoOperacion.Error("Verifique el año (2000-2100), concepto y monto proyectado.");
 
         if (tipo != "Ingreso" && tipo != "Gasto")
             return ResultadoOperacion.Error("El tipo debe ser 'Ingreso' o 'Gasto'.");
 
+        var conceptoNorm = concepto.Trim();
+        if (conceptoNorm.Length > MaxLongitudConcepto)
+            return ResultadoOperacion.Error($"El concepto no puede superar los {MaxLongitudConcepto} caracteres.");
+
+        // [#27] Validar previamente si ya existe un rubro/concepto con el mismo nombre para ese año y tipo
+        var conceptoLower = conceptoNorm.ToLowerInvariant();
+        if (await _repoPresupuesto.ExisteAsync(p => p.Anio == anio && p.Tipo == tipo && p.Concepto.ToLower() == conceptoLower))
+            return ResultadoOperacion.Error($"Ya existe una partida de {tipo} con el concepto '{conceptoNorm}' para el año {anio}.");
+
         var linea = new Presupuesto
         {
             Anio = anio,
-            Concepto = concepto.Trim(),
+            Concepto = conceptoNorm,
             Tipo = tipo,
             MontoProyectado = montoProyectado
         };
@@ -195,17 +208,23 @@ public class ServicioReportes : IServicioReportes
 
     public async Task<List<ProyeccionAnualDto>> CalcularProyeccionQuinquenalAsync(int anioBase, decimal tasaIncrementoAnualPct = 3.0m)
     {
+        // [#26] Acotar la tasa entre -50 % y 100 % para evitar desbordamientos aritméticos
+        decimal tasaAcotada = Math.Clamp(tasaIncrementoAnualPct, TasaMinimaPct, TasaMaximaPct);
+
         var lineasBase = await ListarPresupuestoPorAnioAsync(anioBase);
         decimal ingresosBase = lineasBase.Where(l => l.Tipo == "Ingreso").Sum(l => l.MontoProyectado);
         decimal gastosBase = lineasBase.Where(l => l.Tipo == "Gasto").Sum(l => l.MontoProyectado);
 
         var proyeccion = new List<ProyeccionAnualDto>();
+        decimal multiplicador = 1m + (tasaAcotada / 100m);
+        decimal factor = 1m;
+
         for (int i = 0; i < 5; i++)
         {
-            decimal factor = (decimal)Math.Pow(1.0 + (double)(tasaIncrementoAnualPct / 100m), i);
             decimal ing = Math.Round(ingresosBase * factor, 2);
             decimal gas = Math.Round(gastosBase * factor, 2);
             proyeccion.Add(new ProyeccionAnualDto(anioBase + i, ing, gas, ing - gas));
+            factor *= multiplicador;
         }
 
         return proyeccion;

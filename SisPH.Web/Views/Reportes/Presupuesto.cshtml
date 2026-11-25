@@ -26,7 +26,7 @@
             <label for="inputTasa" class="form-label small fw-semibold mb-1">Incremento anual estimado (%)</label>
             <input type="number" id="inputTasa" name="tasa"
                    value="@Model.TasaIncrementoPct.ToString("0.##", CultureInfo.InvariantCulture)"
-                   step="0.1" min="0" max="50" class="form-control form-control-sm" required />
+                   step="0.1" min="-50" max="100" class="form-control form-control-sm" required />
         </div>
         <div class="col-sm-4 col-md-3">
             <button type="submit" class="btn btn-sm btn-sisph">Consultar año / Recalcular</button>
@@ -53,7 +53,7 @@
                 <div class="mb-3">
                     <label for="inputConcepto" class="form-label small fw-semibold">Concepto *</label>
                     <input type="text" id="inputConcepto" name="concepto" class="form-control"
-                           required maxlength="150" placeholder="Ej. Cuotas ordinarias / Mantenimiento elevadores" />
+                           required maxlength="100" placeholder="Ej. Cuotas ordinarias / Mantenimiento elevadores" />
                 </div>
 
                 <div class="mb-3">

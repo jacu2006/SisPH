@@ -11,13 +11,11 @@ public class ReservasController : Controller
 {
     private readonly IServicioReservas _reservas;
     private readonly IServicioAreas _areas;
-    private readonly IServicioQR _qr;
 
-    public ReservasController(IServicioReservas reservas, IServicioAreas areas, IServicioQR qr)
+    public ReservasController(IServicioReservas reservas, IServicioAreas areas)
     {
         _reservas = reservas;
         _areas = areas;
-        _qr = qr;
     }
 
     [Authorize(Roles = "Administrador")]
@@ -33,7 +31,8 @@ public class ReservasController : Controller
     [HttpPost]
     public async Task<IActionResult> Aprobar(int id)
     {
-        var urlBase = Url.Action(nameof(Index), "Reservas", null, Request.Scheme) ?? string.Empty;
+        // [#11] QR unificado apuntando a Reservas/Verificar/{id}?f={firmaHmac}
+        var urlBase = Url.Action(nameof(Verificar), "Reservas", null, Request.Scheme) ?? string.Empty;
         var res = await _reservas.AprobarAsync(id, User.ObtenerUsuarioId(), urlBase);
         if (!res.Exito)
         {
@@ -68,10 +67,10 @@ public class ReservasController : Controller
         }
 
         var lista = await _reservas.ListarAsync(null, residenteId.Value);
-        var urlBase = Url.Action(nameof(MisReservas), "Reservas", null, Request.Scheme) ?? string.Empty;
+        var urlBase = Url.Action(nameof(Verificar), "Reservas", null, Request.Scheme) ?? string.Empty;
         var qrs = lista
             .Where(r => r.Estado == EstadoReserva.Aprobada)
-            .ToDictionary(r => r.Id, r => _qr.GenerarPngBase64($"{urlBase.TrimEnd('/')}/{r.Id}"));
+            .ToDictionary(r => r.Id, r => _reservas.GenerarQrReserva(r, urlBase));
         ViewBag.QrsAprobadas = qrs;
 
         return View(lista);
@@ -167,5 +166,23 @@ public class ReservasController : Controller
 
         TempData["MensajeExito"] = res.Mensaje;
         return RedirectToAction(nameof(MisReservas));
+    }
+
+    // [#11] Vista pública de verificación de reserva firmada con HMAC-SHA256
+    [AllowAnonymous]
+    [HttpGet]
+    public async Task<IActionResult> Verificar(int id, string? f)
+    {
+        if (string.IsNullOrWhiteSpace(f))
+        {
+            Response.StatusCode = StatusCodes.Status404NotFound;
+            return View((ReservaVerificadaDto?)null);
+        }
+
+        var verificada = await _reservas.ObtenerReservaVerificadaAsync(id, f);
+        if (verificada is null)
+            Response.StatusCode = StatusCodes.Status404NotFound;
+
+        return View(verificada);
     }
 }

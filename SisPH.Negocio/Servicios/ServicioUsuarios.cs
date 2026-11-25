@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Security.Cryptography;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SisPH.Datos.Interfaces;
 using SisPH.Entidades.Entidades;
@@ -53,7 +54,7 @@ public class ServicioUsuarios : IServicioUsuarios
         if (await _repoUsuario.ExisteAsync(u => u.Correo.ToLower() == correoNorm))
             return ResultadoOperacion<string>.Error("Ya existe un usuario registrado con ese correo electrónico.");
 
-        var claveTemporal = $"SisPH#{Guid.NewGuid().ToString("N")[..6]}";
+        var claveTemporal = GenerarClaveTemporalSegura();
 
         var usuario = new Usuario
         {
@@ -62,7 +63,8 @@ public class ServicioUsuarios : IServicioUsuarios
             RolId = rolId,
             PasswordHash = _hash.Transformar(claveTemporal),
             Activo = true,
-            FechaCreacion = DateTime.Now
+            FechaCreacion = DateTime.Now,
+            DebeCambiarPassword = true
         };
 
         await _repoUsuario.AgregarAsync(usuario);
@@ -74,9 +76,16 @@ public class ServicioUsuarios : IServicioUsuarios
             usuario.Id.ToString(),
             $"Usuario creado: {usuario.Correo} (RolId: {rolId}).");
 
+        await _bitacora.RegistrarAsync(
+            adminId,
+            "ClaveTemporalAsignada",
+            "Usuario",
+            usuario.Id.ToString(),
+            "Contraseña temporal asignada; requiere cambio obligatorio en el primer inicio de sesión.");
+
         return ResultadoOperacion<string>.Ok(
             claveTemporal,
-            $"Usuario creado correctamente. Contraseña temporal: {claveTemporal}");
+            $"Usuario creado correctamente. Contraseña temporal (cambio obligatorio al iniciar sesión): {claveTemporal}");
     }
 
     public async Task<ResultadoOperacion> ModificarAsync(int id, string nombre, string correo, int rolId, int adminId)
@@ -84,6 +93,10 @@ public class ServicioUsuarios : IServicioUsuarios
         var usuario = await _repoUsuario.ObtenerPorIdAsync(id);
         if (usuario is null)
             return ResultadoOperacion.Error("El usuario no existe.");
+
+        // [#15] Impedir que el Administrador actual cambie su propio rol
+        if (id == adminId && usuario.RolId != rolId)
+            return ResultadoOperacion.Error("No puedes modificar tu propio rol de Administrador.");
 
         var correoNorm = correo.Trim().ToLowerInvariant();
         if (await _repoUsuario.ExisteAsync(u => u.Id != id && u.Correo.ToLower() == correoNorm))
@@ -107,6 +120,7 @@ public class ServicioUsuarios : IServicioUsuarios
 
     public async Task<ResultadoOperacion> CambiarEstadoActivoAsync(int id, bool activo, int adminId)
     {
+        // [#15] Impedir que el Administrador actual se desactive a sí mismo
         if (!activo && id == adminId)
             return ResultadoOperacion.Error("No puedes darte de baja a ti mismo.");
 
@@ -133,5 +147,16 @@ public class ServicioUsuarios : IServicioUsuarios
             $"Estado Activo cambiado a {activo} para {usuario.Correo}.");
 
         return ResultadoOperacion.Ok(activo ? "Usuario reactivado." : "Usuario dado de baja.");
+    }
+
+    private static string GenerarClaveTemporalSegura()
+    {
+        const string caracteres = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        Span<char> sufijo = stackalloc char[8];
+        for (int i = 0; i < sufijo.Length; i++)
+        {
+            sufijo[i] = caracteres[RandomNumberGenerator.GetInt32(caracteres.Length)];
+        }
+        return $"Sph#{new string(sufijo)}";
     }
 }

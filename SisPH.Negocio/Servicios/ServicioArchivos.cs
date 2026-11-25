@@ -31,34 +31,83 @@ public class ServicioArchivos : IServicioArchivos
         if (string.IsNullOrWhiteSpace(extension) || !ExtensionesPermitidas.Contains(extension))
             throw new InvalidOperationException("Formato de imagen no permitido. Solo se aceptan archivos JPG, PNG o WEBP.");
 
-        var carpetaDestino = Path.Combine(rutaFisicaWwwroot, "uploads", subcarpeta);
+        var subcarpetaLimpia = Path.GetFileName(subcarpeta);
+        var carpetaDestino = Path.Combine(rutaFisicaWwwroot, "uploads", subcarpetaLimpia);
         Directory.CreateDirectory(carpetaDestino);
 
         var nombreBase = Guid.NewGuid().ToString("N");
         var nombreArchivo = $"{nombreBase}{extension.ToLowerInvariant()}";
         var rutaFisica = Path.Combine(carpetaDestino, nombreArchivo);
+        string? rutaFisicaThumb = null;
 
-        using var imagen = await Image.LoadAsync(contenido);
-        await imagen.SaveAsync(rutaFisica);
-
-        var rutaRelativa = $"/uploads/{subcarpeta}/{nombreArchivo}";
-        string? rutaThumbnailRelativa = null;
-
-        if (generarThumbnail)
+        try
         {
-            var nombreThumb = $"{nombreBase}_thumb.jpg";
-            var rutaFisicaThumb = Path.Combine(carpetaDestino, nombreThumb);
+            using var imagen = await Image.LoadAsync(contenido);
+            await imagen.SaveAsync(rutaFisica);
 
-            imagen.Mutate(x => x.Resize(new ResizeOptions
+            var rutaRelativa = $"/uploads/{subcarpetaLimpia}/{nombreArchivo}";
+            string? rutaThumbnailRelativa = null;
+
+            if (generarThumbnail)
             {
-                Size = new Size(anchoThumbnailPx, 0),
-                Mode = ResizeMode.Max
-            }));
+                var nombreThumb = $"{nombreBase}_thumb.jpg";
+                rutaFisicaThumb = Path.Combine(carpetaDestino, nombreThumb);
 
-            await imagen.SaveAsJpegAsync(rutaFisicaThumb);
-            rutaThumbnailRelativa = $"/uploads/{subcarpeta}/{nombreThumb}";
+                imagen.Mutate(x => x.Resize(new ResizeOptions
+                {
+                    Size = new Size(anchoThumbnailPx, 0),
+                    Mode = ResizeMode.Max
+                }));
+
+                await imagen.SaveAsJpegAsync(rutaFisicaThumb);
+                rutaThumbnailRelativa = $"/uploads/{subcarpetaLimpia}/{nombreThumb}";
+            }
+
+            return new ResultadoArchivo(rutaRelativa, rutaThumbnailRelativa);
         }
+        catch (Exception ex) when (ex is UnknownImageFormatException or InvalidImageContentException or ImageFormatException)
+        {
+            IntentarEliminarRutaFisica(rutaFisica);
+            IntentarEliminarRutaFisica(rutaFisicaThumb);
+            throw new InvalidOperationException("El archivo proporcionado no es una imagen válida o está dañado.", ex);
+        }
+        catch
+        {
+            IntentarEliminarRutaFisica(rutaFisica);
+            IntentarEliminarRutaFisica(rutaFisicaThumb);
+            throw;
+        }
+    }
 
-        return new ResultadoArchivo(rutaRelativa, rutaThumbnailRelativa);
+    public void EliminarArchivo(string? rutaRelativa, string rutaFisicaWwwroot)
+    {
+        if (string.IsNullOrWhiteSpace(rutaRelativa) || string.IsNullOrWhiteSpace(rutaFisicaWwwroot))
+            return;
+
+        var relativaLimpia = rutaRelativa.TrimStart('/', '\\').Replace('/', Path.DirectorySeparatorChar);
+        var carpetaUploads = Path.GetFullPath(Path.Combine(rutaFisicaWwwroot, "uploads"));
+        var rutaCompleta = Path.GetFullPath(Path.Combine(rutaFisicaWwwroot, relativaLimpia));
+
+        // Verificar estrictamente que la ruta resuelta esté dentro de wwwroot/uploads/
+        if (!rutaCompleta.StartsWith(carpetaUploads + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        IntentarEliminarRutaFisica(rutaCompleta);
+    }
+
+    private static void IntentarEliminarRutaFisica(string? rutaFisica)
+    {
+        if (string.IsNullOrWhiteSpace(rutaFisica))
+            return;
+
+        try
+        {
+            if (File.Exists(rutaFisica))
+                File.Delete(rutaFisica);
+        }
+        catch
+        {
+            // Evitar enmascarar la excepción original durante limpieza de archivos huérfanos
+        }
     }
 }

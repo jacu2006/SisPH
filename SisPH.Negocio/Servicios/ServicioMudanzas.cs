@@ -38,7 +38,8 @@ public class ServicioMudanzas : IServicioMudanzas
         var query = _repoMudanza.Consultar()
             .Include(m => m.Unidad).ThenInclude(u => u!.Torre)
             .Include(m => m.Usuario)
-            .AsNoTracking();
+            .AsNoTracking()
+            .AsSplitQuery();
 
         if (unidadId.HasValue)
             query = query.Where(m => m.UnidadId == unidadId.Value);
@@ -58,7 +59,7 @@ public class ServicioMudanzas : IServicioMudanzas
         if (unidad is null || !unidad.Activo)
             return ResultadoOperacion.Error("La unidad seleccionada no existe o está inactiva.");
 
-        // CU-19: Verificar paz y salvo antes de autorizar mudanza
+        // CU-19: Verificar paz y salvo dinámico antes de autorizar mudanza
         if (!await _servicioCuotas.UnidadEstaPazYSalvoAsync(unidadId))
             return ResultadoOperacion.Error("Mudanza bloqueada: la unidad tiene cuotas vencidas o morosas pendientes de pago.");
 
@@ -69,9 +70,34 @@ public class ServicioMudanzas : IServicioMudanzas
             {
                 var vigentes = await _repoOcupacion.BuscarAsync(o => o.UnidadId == unidadId && o.FechaFin == null);
                 if (vigentes.Count == 0)
+                {
+                    await transaccion.RollbackAsync();
                     return ResultadoOperacion.Error("La unidad no tiene una ocupación vigente para registrar salida.");
+                }
 
-                foreach (var oc in vigentes)
+                // [#7] Cierre selectivo de ocupación en salida:
+                // 1) Si se indicó un residente específico, cerrar solo esa ocupación vigente.
+                // 2) Si no se indicó y existen inquilinos vigentes, cerrar únicamente al inquilino manteniendo al propietario.
+                // 3) Si solo existe ocupación de propietario, cerrar la más reciente.
+                List<Ocupacion> aCerrar;
+                if (residenteIdEntrada.HasValue)
+                {
+                    aCerrar = vigentes.Where(o => o.ResidenteId == residenteIdEntrada.Value).ToList();
+                    if (aCerrar.Count == 0)
+                    {
+                        await transaccion.RollbackAsync();
+                        return ResultadoOperacion.Error("El residente seleccionado no tiene una ocupación vigente en esta unidad.");
+                    }
+                }
+                else
+                {
+                    var inquilinosVigentes = vigentes.Where(o => o.Tipo == TipoOcupacion.Inquilino).ToList();
+                    aCerrar = inquilinosVigentes.Count > 0
+                        ? inquilinosVigentes
+                        : vigentes.OrderByDescending(o => o.FechaInicio).Take(1).ToList();
+                }
+
+                foreach (var oc in aCerrar)
                 {
                     oc.Cerrar(DateTime.Today);
                     await _repoOcupacion.ModificarAsync(oc);
@@ -80,7 +106,10 @@ public class ServicioMudanzas : IServicioMudanzas
             else
             {
                 if (!residenteIdEntrada.HasValue)
+                {
+                    await transaccion.RollbackAsync();
                     return ResultadoOperacion.Error("Debe seleccionar el residente que ingresa a la unidad.");
+                }
 
                 var nuevaOcupacion = new Ocupacion
                 {

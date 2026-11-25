@@ -85,7 +85,13 @@ public class ReportesController : Controller
     [HttpGet]
     public async Task<IActionResult> Presupuesto(int? anio = null, decimal tasa = 3.0m)
     {
-        int anioBase = anio ?? DateTime.Today.Year;
+        int anioBase = anio.HasValue ? Math.Clamp(anio.Value, 2000, 2100) : DateTime.Today.Year;
+        if (tasa < -50m || tasa > 100m)
+        {
+            TempData["MensajeError"] = "La tasa de incremento anual debe estar comprendida entre -50 % y 100 %.";
+            tasa = Math.Clamp(tasa, -50m, 100m);
+        }
+
         var modelo = new PresupuestoViewModel
         {
             AnioBase = anioBase,
@@ -105,6 +111,8 @@ public class ReportesController : Controller
         decimal montoProyectado,
         decimal tasa = 3.0m)
     {
+        tasa = Math.Clamp(tasa, -50m, 100m);
+
         var res = await _reportes.GuardarLineaPresupuestoAsync(
             anio, concepto, tipo, montoProyectado, User.ObtenerUsuarioId());
 

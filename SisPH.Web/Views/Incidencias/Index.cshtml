@@ -92,7 +92,7 @@
                                             <button type="submit" class="btn btn-sm btn-outline-warning">Tomar</button>
                                         </form>
                                     }
-                                    @if (inc.Estado == EstadoIncidencia.Abierta || inc.Estado == EstadoIncidencia.EnProceso)
+                                    @if (inc.Estado == EstadoIncidencia.EnProceso)
                                     {
                                         <button type="button" class="btn btn-sm btn-outline-success"
                                                 data-bs-toggle="modal" data-bs-target="#modalResolverInc-@inc.Id">
@@ -135,7 +135,7 @@
         </div>
     }
 
-    if (inc.Estado == EstadoIncidencia.Abierta || inc.Estado == EstadoIncidencia.EnProceso)
+    if (inc.Estado == EstadoIncidencia.EnProceso)
     {
         <div class="modal fade" id="modalResolverInc-@inc.Id" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog">

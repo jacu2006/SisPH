@@ -129,7 +129,7 @@
                 Firma: @pago.Firma
             </div>
             <div class="mt-2 no-print">
-                <a asp-action="Verificar" asp-route-id="@pago.Id" class="small text-decoration-none">
+                <a asp-action="Verificar" asp-route-id="@pago.Id" asp-route-f="@pago.Firma" class="small text-decoration-none">
                     Abrir enlace público de verificación →
                 </a>
             </div>

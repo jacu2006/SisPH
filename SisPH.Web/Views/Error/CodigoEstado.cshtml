@@ -1,0 +1,45 @@
+@{
+    int codigo = ViewBag.StatusCode is int c ? c : 404;
+    ViewData["Title"] = codigo switch
+    {
+        404 => "Página no encontrada (404)",
+        403 => "Acceso denegado (403)",
+        _ => $"Error HTTP {codigo}"
+    };
+}
+
+<div class="container py-5">
+    <div class="sisph-card p-5 mx-auto text-center" style="max-width: 540px;">
+        <div class="display-5 fw-bold text-sisph mb-2">@codigo</div>
+        @if (codigo == 404)
+        {
+            <h1 class="h4 fw-bold text-sisph mb-2">Recurso o página no encontrada</h1>
+            <p class="text-muted small mb-4">
+                La dirección que intentaste consultar no existe o ya no está disponible.
+            </p>
+        }
+        else if (codigo == 403)
+        {
+            <h1 class="h4 fw-bold text-danger mb-2">Acceso denegado</h1>
+            <p class="text-muted small mb-4">
+                Tu perfil actual no cuenta con permisos suficientes para acceder a este recurso.
+            </p>
+        }
+        else
+        {
+            <h1 class="h4 fw-bold text-sisph mb-2">No se pudo completar la solicitud</h1>
+            <p class="text-muted small mb-4">
+                El servidor respondió con el código de estado HTTP @codigo.
+            </p>
+        }
+
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <a asp-controller="Home" asp-action="Panel" class="btn btn-sisph">Volver al panel principal</a>
+        }
+        else
+        {
+            <a asp-controller="Home" asp-action="Index" class="btn btn-sisph">Volver al inicio</a>
+        }
+    </div>
+</div>

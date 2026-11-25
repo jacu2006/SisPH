@@ -7,14 +7,26 @@
 USE master;
 GO
 
-IF DB_ID(N'SisPH') IS NOT NULL
-BEGIN
-    ALTER DATABASE SisPH SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-    DROP DATABASE SisPH;
-END;
-GO
+/* ============================================================================
+   ADVERTENCIA DE SEGURIDAD:
+   Este script está diseñado para ejecutarse únicamente sobre una base de datos
+   nueva o limpia. No se ejecuta DROP DATABASE de forma automática para evitar
+   la pérdida accidental de datos en entornos existentes.
+   Si necesitas recrear la base de datos en desarrollo local, elimínala
+   manualmente primero o descomenta el bloque siguiente bajo tu responsabilidad:
 
-CREATE DATABASE SisPH;
+   IF DB_ID(N'SisPH') IS NOT NULL
+   BEGIN
+       ALTER DATABASE SisPH SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+       DROP DATABASE SisPH;
+   END;
+   ============================================================================ */
+
+IF DB_ID(N'SisPH') IS NULL
+BEGIN
+    CREATE DATABASE [SisPH];
+    ALTER DATABASE [SisPH] SET AUTO_CLOSE OFF;
+END;
 GO
 
 USE SisPH;
@@ -350,6 +362,23 @@ BEGIN
     IF EXISTS (SELECT 1 FROM Cuota WHERE Periodo = @Periodo AND Tipo = @Tipo)
     BEGIN
         RAISERROR('Ya existen cuotas generadas para ese período y tipo.', 16, 1);
+        RETURN;
+    END;
+
+    DECLARE @SumaCoeficienteGlobal DECIMAL(9,4);
+    SELECT @SumaCoeficienteGlobal = ISNULL(SUM(Coeficiente), 0)
+    FROM Unidad
+    WHERE Activo = 1;
+
+    IF @SumaCoeficienteGlobal <= 0
+    BEGIN
+        RAISERROR('No existen unidades activas con coeficiente válido.', 16, 1);
+        RETURN;
+    END;
+
+    IF @SumaCoeficienteGlobal > 100.0000
+    BEGIN
+        RAISERROR('La suma global de coeficientes activos de todo el PH supera el 100 %%. Ajuste los coeficientes antes de generar cuotas.', 16, 1);
         RETURN;
     END;
 
